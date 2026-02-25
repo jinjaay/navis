@@ -3,16 +3,15 @@ import path from "node:path";
 
 import { promptLibrary } from "../src/content/prompts";
 
-const siteUrl = process.env.SITE_URL ?? "https://example.com";
-const basePath = "/prompts";
+const siteUrl = process.env.SITE_URL ?? "https://travelerprompt.replit.app";
 
 const url = (pathname: string) =>
   `${siteUrl.replace(/\/$/, "")}${pathname}`;
 
 const routes = [
-  `${basePath}`,
-  `${basePath}/insights`,
-  ...promptLibrary.map((prompt) => `${basePath}/${prompt.slug}`),
+  "/",
+  "/insights",
+  ...promptLibrary.map((prompt) => `/prompts/${prompt.slug ?? prompt.id}`),
 ];
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>

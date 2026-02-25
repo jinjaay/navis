@@ -56,20 +56,8 @@
 /* Only apply hover effects on devices that support hover (non-touch) */
 @media (hover: hover) and (pointer: fine) {
   .hover-card:hover {
-    border-color: rgba(255, 52, 7, 0.3);
-    box-shadow: 0 20px 25px -5px rgba(255, 52, 7, 0.05), 0 8px 10px -6px rgba(255, 52, 7, 0.05);
-  }
-  .hover-card:hover .hover-badge {
-    background-color: rgba(255, 52, 7, 0.1);
-    color: #ff3407;
-  }
-  .hover-card:hover .hover-title {
-    color: #ff3407;
-  }
-  .hover-card:hover .hover-tag {
-    border-color: rgba(255, 52, 7, 0.1);
-    background-color: rgba(255, 52, 7, 0.05);
-    color: rgba(255, 52, 7, 0.8);
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.08);
   }
   .hover-copy:hover {
     border-color: #cbd5e1;
@@ -77,15 +65,14 @@
     color: #0f172a;
   }
   .hover-open:hover {
-    background-color: rgba(255, 52, 7, 0.9);
-    box-shadow: 0 10px 15px -3px rgba(255, 52, 7, 0.3);
+    background-color: #e62e06;
   }
   .hover-pill:hover {
     background-color: #e2e8f0;
     color: #334155;
   }
   .hover-search-ring:hover {
-    --tw-ring-color: rgba(255, 52, 7, 0.2);
+    --tw-ring-color: rgba(255, 52, 7, 0.15);
     --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
     --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
     box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
@@ -94,7 +81,7 @@
     color: hsl(var(--foreground));
   }
   .hover-clear:hover {
-    background-color: rgba(255, 52, 7, 0.05);
+    background-color: rgba(255, 52, 7, 0.04);
   }
   .hover-clear-x:hover {
     background-color: #f1f5f9;

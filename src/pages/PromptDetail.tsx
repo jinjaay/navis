@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { promptLibrary } from "@/content/prompts";
+import { promptLibrary, buildPreamble } from "@/content/prompts";
 import {
   ChatGPTIcon,
   GeminiIcon,
@@ -106,10 +106,11 @@ export const PromptDetail = ({ slug }: { slug?: string }) => {
   }
 
   const renderedPrompt = hydrateTemplate(prompt.promptTemplate, values);
+  const copyablePrompt = buildPreamble(prompt) + "\n\n" + renderedPrompt;
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(renderedPrompt);
+      await navigator.clipboard.writeText(copyablePrompt);
       trackEvent({
         name: "prompt_copy",
         payload: {
@@ -207,7 +208,7 @@ export const PromptDetail = ({ slug }: { slug?: string }) => {
                       className="cursor-pointer gap-2"
                       onClick={async () => {
                         try {
-                          await navigator.clipboard.writeText(renderedPrompt);
+                          await navigator.clipboard.writeText(copyablePrompt);
                           trackEvent({
                             name: "outbound_click",
                             payload: {
@@ -216,7 +217,7 @@ export const PromptDetail = ({ slug }: { slug?: string }) => {
                             },
                           });
                           window.open(
-                            service.buildUrl(renderedPrompt),
+                            service.buildUrl(copyablePrompt),
                             "_blank",
                             "noreferrer"
                           );
@@ -227,7 +228,7 @@ export const PromptDetail = ({ slug }: { slug?: string }) => {
                           );
                         } catch {
                           window.open(
-                            service.buildUrl(renderedPrompt),
+                            service.buildUrl(copyablePrompt),
                             "_blank",
                             "noreferrer"
                           );

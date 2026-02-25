@@ -1,10 +1,10 @@
 export type PromptCategory =
-  | "Flights"
-  | "Hotels"
-  | "Packages"
-  | "Transport"
-  | "Planning"
-  | "Cards & Miles";
+  | "Itinerary"
+  | "Stays"
+  | "Food & Drink"
+  | "Routes"
+  | "Discovery"
+  | "Smart Planning";
 
 export type PromptVariable = {
   key: string;
@@ -27,744 +27,1055 @@ export type PromptEntry = {
   whenToUse?: string[];
 };
 
+const ROLE_BY_CATEGORY: Record<PromptCategory, string> = {
+  Itinerary:
+    "You are a world-class travel planner who designs realistic, minute-by-minute itineraries travelers can actually follow — with real place names, transit details, and smart timing.",
+  Stays:
+    "You are a local area expert who knows the character, tradeoffs, and hidden details of every district — the kind of advice a resident friend would give.",
+  "Food & Drink":
+    "You are a food-obsessed travel guide who knows the stalls, markets, and restaurants locals swear by — not the tourist-friendly places with menus in five languages.",
+  Routes:
+    "You are a route-planning specialist who builds transit-aware, walking-friendly itineraries that respect opening hours, crowd patterns, and real-world logistics.",
+  Discovery:
+    "You are a well-traveled insider who finds the hidden gems, local rituals, and off-guidebook experiences that turn a trip into a story worth telling.",
+  "Smart Planning":
+    "You are a sharp travel strategist who helps travelers make confident decisions — comparing options, building budgets, and handling logistics with clear tradeoffs.",
+};
+
+export const buildPreamble = (prompt: PromptEntry): string => {
+  const role = ROLE_BY_CATEGORY[prompt.category];
+  const isComparison = prompt.intent === "comparison";
+
+  const outputInstruction = isComparison
+    ? "Output: Lead with your #1 recommendation and why. Then a compact comparison table. Then the key decision thresholds (\"choose the other option if…\")."
+    : prompt.intent === "checklist"
+      ? "Output: Lead with the most important actions first. Then a structured, actionable checklist. Flag deadlines and sequence-dependent items."
+      : "Output: Lead with the key recommendation or plan. Then the full detailed breakdown. Be specific — real names, times, costs, and directions.";
+
+  return [
+    role,
+    "",
+    "Before answering, check if you have enough context to give a genuinely useful, personalized answer.",
+    "- If critical details are missing that would significantly change your recommendation, ask me up to 3 focused clarifying questions FIRST — then wait for my reply before proceeding.",
+    "- If you can give a strong answer with reasonable assumptions, go ahead — clearly label every assumption so I can correct it.",
+    "- Anything in double angle brackets (e.g. <<Destination city>>) is info I haven't provided yet. Ask me for it or make a reasonable assumption.",
+    "- If you reference prices, hours, or availability, note they may change and briefly suggest how I can verify.",
+    "- Your training data has a cutoff date. For any specific business, price, or schedule you mention, flag it with [verify] and suggest how to check (e.g. Google Maps, official site, recent reviews).",
+    "- Rate your confidence: use [high confidence] for well-established facts and [check before going] for things that may have changed since your training data.",
+    "- Prefer specific, named places over generic descriptions. If you can't name a specific place with confidence, say so rather than inventing one.",
+    "",
+    outputInstruction,
+  ].join("\n");
+};
+
 export const categories: PromptCategory[] = [
-  "Flights",
-  "Hotels",
-  "Packages",
-  "Transport",
-  "Planning",
-  "Cards & Miles",
+  "Itinerary",
+  "Stays",
+  "Food & Drink",
+  "Routes",
+  "Discovery",
+  "Smart Planning",
 ];
 
 export const promptLibrary: PromptEntry[] = [
-  // ── Flights ──────────────────────────────────────────────────────────
+  // ── Itinerary ─────────────────────────────────────────────────────────
   {
-    id: "flight-cashback-compare",
-    title: "Compare flight bookings to get the best total value",
+    id: "trip-itinerary-builder",
+    slug: "trip-itinerary-builder",
+    title: "Build a day-by-day trip itinerary",
     summary:
-      "A step-by-step workflow to compare fares across channels, including baggage, fees, and flexibility—so you pay less overall.",
-    category: "Flights",
-    intent: "comparison",
+      "You already know where you're going — turn that into a detailed, hour-by-hour plan with transit, meal stops, and backup options.",
+    category: "Itinerary",
+    intent: "planning",
     purpose:
-      "Helps travelers look past headline prices and choose the option with the lowest true cost and the right flexibility for their trip.",
-    tags: ["flights", "comparison", "fees", "flexibility"],
+      "For travelers who've picked a destination and need the logistics nailed: realistic time blocks, walking/transit connections, neighborhood grouping, and backup options for closures or weather.",
+    tags: ["itinerary", "day-by-day", "planning", "trip"],
     variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "origin", label: "Origin city", placeholder: "e.g. Singapore", example: "Singapore" },
-      { key: "destination", label: "Destination city", placeholder: "e.g. Tokyo", example: "Tokyo" },
-      { key: "month", label: "Travel month", placeholder: "e.g. October", example: "October" },
-      { key: "budget", label: "Flight budget", placeholder: "e.g. $900 per person or 'mid-range'", example: "$900 per person" },
-    ],
-    whenToUse: [
-      "When you have a route in mind and want the best total price (not just the cheapest fare)",
-      "Before booking on any single site",
-      "When baggage/seat fees and change rules might swing the real cost",
-    ],
-    promptTemplate: `I want to book a return flight from {{origin}} to {{destination}} in {{month}}. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me build a comparison workflow to get the best total value.
-
-Step 1 — Where to check: List the main places I should compare (airline direct, major OTAs, metasearch tools). Include what each is best for (price, flexibility, customer support, easy changes).
-
-Step 2 — A comparison worksheet: Create a blank table I can fill in with these columns:
-Channel | Fare | Bags (carry-on/checked) | Seat selection | Payment fees / FX fees | Change/cancel rules | Total all-in cost | Notes (layovers, arrival time, reliability).
-
-Step 3 — “Cheapest” vs “best value”: Explain the tradeoffs between booking direct vs an OTA (support during disruptions, changes/refunds, seat selection, schedule changes).
-
-Step 4 — Before you click “Pay” checklist: Remind me to verify (a) passenger names match passport, (b) baggage rules, (c) fare class and what’s included, (d) total price in the right currency, (e) whether the site is offering dynamic currency conversion and how to avoid it, (f) refund/change rules and deadlines, (g) contact/support path.
-
-Step 5 — After I collect 3–5 quotes: Suggest 2–3 follow-up prompts I can ask you to help me pick the best option.`,
-  },
-  {
-    id: "flight-budget-maximizer",
-    title: "Budget airline booking playbook (avoid add-on traps)",
-    summary:
-      "A practical strategy for low-cost carriers covering timing, add-ons, fare types, and checkout gotchas.",
-    category: "Flights",
-    intent: "optimization",
-    purpose:
-      "Helps travelers reduce the real cost of budget flights by planning add-ons intentionally and choosing the right booking path.",
-    tags: ["budget airlines", "add-ons", "savings", "strategy"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "friends" },
-      { key: "origin", label: "Origin city", placeholder: "e.g. Kuala Lumpur", example: "Kuala Lumpur" },
-      { key: "destination", label: "Destination city", placeholder: "e.g. Bali", example: "Bali" },
-      { key: "budget", label: "Flight budget", placeholder: "e.g. $250 per person or 'tight'", example: "$250 per person" },
-    ],
-    whenToUse: [
-      "When booking low-cost carriers",
-      "When you want to decide which add-ons are worth it",
-      "When you want to avoid common checkout upsells and fees",
-    ],
-    promptTemplate: `I'm booking a budget airline flight from {{origin}} to {{destination}}. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me maximize savings with a structured approach.
-
-1. Booking timing: Share general patterns that can help (when prices typically move, what to watch for, and when to set price alerts).
-
-2. Fare types explained: Compare “basic” vs “bundle” vs “flex” style fares. When does paying more up front reduce the total cost (bags, seats, changes)?
-
-3. Add-on economics: For each add-on (checked baggage, seats, meals, priority boarding, insurance), explain when to buy at booking vs later vs skip. Flag the add-ons that are usually poor value.
-
-4. Channel choices: Should I book via the airline site, airline app, or an OTA? Compare price differences, ease of changes, and support during disruptions.
-
-5. Checkout checklist: Remind me to double-check currency, payment fees, baggage rules, seat charges, and any pre-ticked boxes before paying.
-
-6. Suggest 2 follow-up prompts I can use after I find 2–3 fare options to choose the best one.`,
-  },
-  {
-    id: "flight-error-fare-alert",
-    title: "Error fares: how to verify and book safely",
-    summary:
-      "A speed-and-risk playbook for spotting error fares, booking fast, and reducing the chance of expensive mistakes.",
-    category: "Flights",
-    intent: "strategy",
-    purpose:
-      "Teaches a calm, repeatable workflow for error fares—move quickly, protect yourself, and avoid locking in non-refundable extras too early.",
-    tags: ["error fares", "speed", "risk", "workflow"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "family" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $2000 total or 'tight'", example: "$2000 total" },
-    ],
-    whenToUse: [
-      "When you see a suspiciously cheap flight",
-      "When you want a safe protocol for booking fast",
-      "When you need to understand what to do after booking",
-    ],
-    promptTemplate: `I might book an error fare. I'm traveling as a {{party}} and my rough budget is {{budget}}. Explain flight error fares and give me a complete speed-and-risk playbook for acting on them.
-
-1. What are error fares? Briefly explain how they happen and how often airlines honor them.
-
-2. How to spot them: List reliable places to verify quickly (metasearch, airline site, known communities/alerts). What patterns suggest “error” vs a real sale?
-
-3. Speed protocol: Give a step-by-step action plan optimized for speed but safe decision-making (verify once, book once, avoid unnecessary calls, use a payment method with strong dispute protections).
-
-4. Post-booking caution: What NOT to book immediately (non-refundable hotels, tours), and what you can do safely (refundable options, holding plans). Include a timeline for waiting for ticketing confirmation.
-
-5. If it gets canceled: What are my realistic outcomes and next steps (refund timeline, documentation to keep, how to rebook smartly).
-
-6. Suggest 2 follow-up prompts for monitoring sources and understanding cancellation policies.`,
-  },
-
-  // ── Hotels ───────────────────────────────────────────────────────────
-  {
-    id: "hotel-cashback-stacking",
-    title: "Book hotels smarter: direct vs OTA and true total cost",
-    summary:
-      "Compare direct and OTA bookings with a focus on total cost, fees, flexibility, and real value (not just the nightly rate).",
-    category: "Hotels",
-    intent: "optimization",
-    purpose:
-      "Helps travelers choose the best-value hotel booking by factoring in taxes, resort fees, cancellation rules, and included perks like breakfast or parking.",
-    tags: ["hotels", "direct vs OTA", "fees", "value"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "destination", label: "Destination city", placeholder: "e.g. Bangkok", example: "Bangkok" },
-      { key: "nights", label: "Number of nights", placeholder: "e.g. 4", example: "4" },
-      { key: "budget", label: "Nightly budget (USD)", placeholder: "e.g. 150", example: "150" },
-    ],
-    whenToUse: [
-      "When choosing between booking direct vs an OTA",
-      "When fees and cancellation rules might change the best option",
-      "When you’re trying to maximize value at a specific budget",
-    ],
-    promptTemplate: `I'm booking a hotel in {{destination}} for {{nights}} nights at around \${{budget}}/night. I'm traveling as a {{party}}. Help me pick the best-value booking option.
-
-1. Direct vs OTA tradeoffs: Compare booking direct vs OTAs with focus on: cancellation flexibility, support during issues, room type accuracy, fees, and chances of upgrades/benefits.
-
-2. True total cost checklist: List what I must include to compare fairly (taxes, resort/city fees, breakfast, parking, Wi‑Fi, extra bed, deposit/holds).
-
-3. Rate types explained: Prepaid vs pay-at-property vs refundable vs non-refundable. When does paying more for flexibility save money overall?
-
-4. Worked worksheet: Provide a fillable table:
-Channel | Nightly rate | Taxes/fees | Value of inclusions | Cancellation terms | Total trip cost | Notes.
-
-5. Booking checklist: Remind me to verify the final price, currency, cancellation deadline, and what exactly is included before paying.
-
-6. Suggest 2 follow-up prompts once I’ve gathered 3–5 quotes.`,
-  },
-  {
-    id: "hotel-last-minute-deals",
-    title: "Last-minute hotel booking strategy",
-    summary:
-      "A fast workflow for booking on short notice: best channels, mobile vs desktop, and refundable vs non-refundable tradeoffs.",
-    category: "Hotels",
-    intent: "strategy",
-    purpose:
-      "Gives travelers a clear, repeatable way to book quickly without overpaying or choosing the wrong cancellation policy.",
-    tags: ["last-minute", "hotels", "channels", "workflow"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "solo" },
-      { key: "destination", label: "Destination city", placeholder: "e.g. Seoul", example: "Seoul" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $180/night or 'mid-range'", example: "$180/night" },
-    ],
-    whenToUse: [
-      "When you need a hotel within the next 48 hours",
-      "When comparing app-only prices vs desktop",
-      "When you need to balance price vs flexibility fast",
-    ],
-    promptTemplate: `I need a hotel in {{destination}} within the next 48 hours. I'm traveling as a {{party}} and my rough budget is {{budget}}. Give me a channel strategy for finding the best price quickly.
-
-1. Channel comparison: Compare hotel direct, major OTAs, last-minute/same-day apps, and calling the property. Note typical price behavior and flexibility.
-
-2. Urgency tactics:
-   - 24–48 hours out: what works best?
-   - Same-day: what changes (negotiation, app flash prices, nearby neighborhoods)?
-
-3. Refundable vs non-refundable: Give decision rules and examples of when it’s worth paying more for refundability.
-
-4. Fast checklist (30 seconds): A minimal checklist before booking: final price, fees, location, cancellation deadline, and room type.
-
-5. Suggest 2 follow-up prompts for comparing my top 3 options.`,
-  },
-  {
-    id: "hotel-vs-rental",
-    title: "Hotel vs short-term rental: true cost comparison",
-    summary:
-      "A worksheet-style comparison that includes all fees, space needs, and flexibility—so you pick the best-value stay.",
-    category: "Hotels",
-    intent: "comparison",
-    purpose:
-      "Helps travelers avoid surprise fees and choose the stay that best matches their group size, plans, and risk tolerance.",
-    tags: ["comparison", "rental", "total cost", "fees"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "family" },
-      { key: "destination", label: "Destination city", placeholder: "e.g. Barcelona", example: "Barcelona" },
-      { key: "nights", label: "Number of nights", placeholder: "e.g. 5", example: "5" },
-      { key: "travelers", label: "Number of travelers", placeholder: "e.g. 4", example: "4" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $250/night or '$1200 total'", example: "$250/night" },
-    ],
-    whenToUse: [
-      "When deciding between a hotel and a short-term rental",
-      "When traveling as a group and comparing space vs cost",
-      "When you want to factor in cleaning/service fees and policies",
-    ],
-    promptTemplate: `I'm traveling to {{destination}} for {{nights}} nights with {{travelers}} people. We're traveling as a {{party}} and our rough budget is {{budget}}. Help me compare a hotel vs a short-term rental based on true total cost and practicality.
-
-1. True cost worksheet: Create a side-by-side table I can fill in.
-Hotel: nightly rate, taxes, resort/city fees, parking, breakfast, total.
-Rental: nightly rate, cleaning fee, service fee, taxes, deposits, utilities/extras, total.
-
-2. Practicality factors: Compare location convenience, check-in friction, space/privacy, laundry/kitchen value, and cancellation risk.
-
-3. Hybrid idea: When does it make sense to split (some nights hotel, some nights rental)?
-
-4. Hidden costs: List the common “gotchas” that change the real cost.
-
-5. Suggest 2 follow-up prompts after I gather 2 hotel options and 2 rental options.`,
-  },
-
-  // ── Packages ─────────────────────────────────────────────────────────
-  {
-    id: "package-deal-builder",
-    title: "Bundle vs separate: what’s cheaper for your trip?",
-    summary:
-      "A decision framework to compare packages against separate bookings using total cost, flexibility, and hassle factor.",
-    category: "Packages",
-    intent: "optimization",
-    purpose:
-      "Helps travelers make a clean bundle-vs-separate decision by comparing like-for-like prices and the real cost of changes and cancellations.",
-    tags: ["packages", "bundling", "comparison", "total cost"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "friends" },
       { key: "destination", label: "Destination city", placeholder: "e.g. Osaka", example: "Osaka" },
-      { key: "duration", label: "Trip duration (days)", placeholder: "e.g. 7", example: "7" },
-      { key: "travelers", label: "Number of travelers", placeholder: "e.g. 2", example: "2" },
-      { key: "budget", label: "Total budget", placeholder: "e.g. $2500 total or 'mid-range'", example: "$2500 total" },
+      { key: "days", label: "Number of days", placeholder: "e.g. 3 / 5 / 10", example: "5" },
+      { key: "vibe", label: "Trip vibe", placeholder: "e.g. culture + street food / adventure / relaxed", example: "culture + street food" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
+      { key: "month", label: "Travel month", placeholder: "e.g. November", example: "November" },
     ],
     whenToUse: [
-      "When choosing between a flight+hotel package vs separate bookings",
-      "When you want to compare flexibility and support, not just price",
-      "When you want a worksheet to decide quickly",
+      "When you've already chosen your destination and need the detailed day-by-day logistics",
+      "When you want a plan you can actually follow — timed slots, transit, and backup options",
+      "When you've been before (or done your research) and just need the schedule built",
     ],
-    promptTemplate: `Help me plan a {{duration}}-day trip to {{destination}} for {{travelers}} people. We're traveling as a {{party}} and our rough budget is {{budget}}. I want to decide whether bundling (flight + hotel package) or booking separately is cheaper and smarter.
+    promptTemplate: `I'm planning a trip to {{destination}} for {{days}} days in {{month}}. I'm traveling as a {{party}} and the vibe I want is: {{vibe}}.
 
-1. Bundle vs separate tradeoffs: Compare pros/cons focusing on total cost, cancellation/change rules, and how easy it is to fix problems.
+Build a day-by-day itinerary:
 
-2. Fillable worksheet: Create a table:
-Component | Bundle option price | Separate option price | What’s included | Cancellation/change rules | Notes.
-Rows: Flights, Accommodation, Airport Transfer, Activities/Tours, Travel Insurance.
+1. DAY-BY-DAY PLAN: For each day, create time-blocked slots (morning, midday, afternoon, evening). For each slot include:
+   - What to do and why it's worth the time
+   - Approximate duration at each stop
+   - How to get to the next stop (walking time, transit line, or taxi estimate)
+   - One backup option in case it's closed or too crowded
 
-3. Where bundles hide cost: Call out common areas where the “headline” package price differs from the real cost (room types, baggage, transfer assumptions, taxes/fees).
+2. OPENING HOURS & TIMING: Flag any spots with tricky hours (closed certain days, seasonal hours, ticket-only entry). Suggest the best arrival time to avoid crowds.
 
-4. Decision rules: Give simple rules of thumb for when bundles usually win vs when separate booking is safer/better value.
+3. NEIGHBORHOOD FLOW: Group activities by neighborhood so I'm not zigzagging across the city. Explain the logical flow.
 
-5. Suggest 2 follow-up prompts after I gather quotes.`,
+4. MEALS: Suggest specific meal spots (or street food areas) that fit naturally into the route. Include what they're known for.
+
+5. EVENING OPTIONS: For each night, suggest 2 options (one low-key, one more active) based on energy levels after a full day.
+
+6. PACKING SHORTLIST: 3–5 items specific to this destination and season that most travelers forget.
+
+Format the plan so I can screenshot each day and use it as a walking guide.
+
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
   },
   {
-    id: "honeymoon-savings-plan",
-    title: "Plan a honeymoon with smart splurge-vs-save choices",
+    id: "first-time-city-plan",
+    slug: "first-time-city-plan",
+    title: "First-time visitor: complete city plan",
     summary:
-      "Design a honeymoon itinerary with a realistic budget, clear tradeoffs, and smart places to save without sacrificing the experience.",
-    category: "Packages",
+      "Never been? Get the orientation a local friend would give you — what to prioritize, what to skip, and a plan that balances must-sees with real local life.",
+    category: "Itinerary",
     intent: "planning",
     purpose:
-      "Turns a big trip into a calm plan: prioritize what matters, control the big-ticket items, and avoid expensive last-minute decisions.",
-    tags: ["honeymoon", "luxury", "planning", "budget"],
+      "Gives first-time visitors the cultural briefing, must-see vs skip assessment, and practical logistics that bridge the gap between 'I've never been' and 'I feel confident going.'",
+    tags: ["first-time", "city plan", "must-see", "comprehensive"],
     variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "destination", label: "Destination", placeholder: "e.g. Maldives", example: "Maldives" },
-      { key: "duration", label: "Trip duration (days)", placeholder: "e.g. 10", example: "10" },
-      { key: "budget", label: "Total budget (USD)", placeholder: "e.g. 8000", example: "8000" },
+      { key: "destination", label: "Destination city", placeholder: "e.g. Tokyo", example: "Tokyo" },
+      { key: "days", label: "Number of days", placeholder: "e.g. 5", example: "5" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "friends" },
+      { key: "interests", label: "Top interests", placeholder: "e.g. food, temples, nightlife, shopping", example: "food, temples, nightlife" },
+      { key: "month", label: "Travel month", placeholder: "e.g. March", example: "March" },
     ],
     whenToUse: [
-      "When planning a honeymoon or special occasion trip",
-      "When you want to balance splurges with smart savings",
-      "When you want a budget-first itinerary",
+      "When it's your first time visiting and you don't know what to expect",
+      "When you need to understand the city layout, norms, and what's actually worth the hype",
+      "When you want orientation + itinerary together (not just a schedule)",
     ],
-    promptTemplate: `Plan a {{duration}}-day honeymoon to {{destination}}. We're traveling as a {{party}} with a budget of \${{budget}}. I want an itinerary that feels special but stays on budget.
+    promptTemplate: `I'm visiting {{destination}} for the first time — {{days}} days in {{month}}. I'm traveling as a {{party}} and my top interests are: {{interests}}.
 
-1. Itinerary outline: Suggest a day-by-day outline: flights, accommodation options (2 tiers), dining, activities/excursions, and transfers.
+Create a complete first-timer city plan:
 
-2. Booking strategy per component: For each component, suggest the best approach (when to book, what to compare, refundable vs non-refundable, where upgrades matter most).
+1. ORIENTATION BRIEFING: In 4–5 bullet points, give me the local knowledge a friend who lives there would share — how the city is laid out, how to get around, cultural norms, tipping, and common first-timer mistakes.
 
-3. Budget worksheet: Create a fillable budget table:
-Component | Estimated cost | Booking approach | Flexibility level | Notes.
+2. DAY-BY-DAY ITINERARY: For each day, provide:
+   - A theme (e.g. "Historic core + street food")
+   - 3–4 main activities with time estimates
+   - Transit/walking between stops
+   - Meal recommendations that fit the route
+   - One "local secret" that most tourists miss in that area
 
-4. Splurge vs save: Recommend where to splurge (high-impact experiences) and where to save (low-impact swaps).
+3. MUST-SEE vs SKIP: List the top attractions and honestly assess which are worth the hype and which are overrated tourist traps. Suggest what to do instead.
 
-5. Booking checklist: A short checklist before each purchase to avoid expensive mistakes.
+4. PRACTICAL LOGISTICS:
+   - Best transit pass or card to buy
+   - SIM/eSIM recommendation
+   - Cash vs card norms
+   - Key phrases in the local language
+   - Safety notes specific to this city
 
-6. Suggest 2 follow-up prompts once I pick my top options.`,
-  },
+5. WEATHER-ADJUSTED TIPS: For {{month}}, flag weather considerations and suggest indoor alternatives for rainy/hot days.
 
-  // ── Transport ────────────────────────────────────────────────────────
-  {
-    id: "car-rental-cashback",
-    title: "Car rental costs explained (get the best rate, avoid surprises)",
-    summary:
-      "Compare channels, prepay vs pay-at-counter, insurance choices, and hidden fees to lower the real cost of renting a car.",
-    category: "Transport",
-    intent: "comparison",
-    purpose:
-      "Helps travelers reduce car rental cost by understanding insurance, deposit holds, fuel policies, and common fee traps.",
-    tags: ["car rental", "insurance", "hidden fees", "comparison"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "family" },
-      { key: "destination", label: "Destination city/country", placeholder: "e.g. Italy", example: "Italy" },
-      { key: "days", label: "Rental duration (days)", placeholder: "e.g. 5", example: "5" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $60/day or '$400 total'", example: "$60/day" },
-    ],
-    whenToUse: [
-      "When renting a car and you want the lowest all-in cost",
-      "When comparing prepay vs pay-at-counter",
-      "When deciding insurance vs credit card coverage",
-    ],
-    promptTemplate: `I need to rent a car in {{destination}} for {{days}} days. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me find the best all-in price without getting hit by surprise fees.
+6. ONE FREE DAY TEMPLATE: Leave one day as a flexible "choose your own adventure" with 5 options ranked by vibe (relaxed, active, cultural, foodie, off-beat).
 
-1. Channel comparison: List booking options (aggregators, direct rental companies, local providers). Explain typical pros/cons and when each wins.
-
-2. Prepay vs pay-at-counter: Explain tradeoffs (price, flexibility, cancellation, deposit holds).
-
-3. Insurance decision tree: Walk me through common insurance choices (CDW/LDW, third-party, credit card coverage). Flag the questions I must answer (coverage limits, exclusions, documentation).
-
-4. Hidden fees checklist: List the usual cost inflators (airport surcharges, young/additional driver, fuel policy, cross-border, toll devices, FX/DCC).
-
-5. Fillable table: Channel | Base rate | Insurance | Fees | Deposit/hold | Total | Notes.
-
-6. Suggest 2 follow-up prompts after I collect quotes.`,
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
   },
   {
-    id: "airport-transfer-deals",
-    title: "Airport transfer chooser (cheapest vs fastest vs easiest)",
+    id: "multi-city-route-planner",
+    slug: "multi-city-route-planner",
+    title: "Multi-city trip: optimal route and timing",
     summary:
-      "Compare transfer options with a simple table and decision rules based on cost, time, luggage, and arrival time.",
-    category: "Transport",
-    intent: "comparison",
-    purpose:
-      "Helps travelers pick the right transfer without overpaying—especially when tired, late, or carrying luggage.",
-    tags: ["airport", "transfers", "comparison", "decision"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "airport", label: "Airport name or code", placeholder: "e.g. NRT (Narita)", example: "NRT (Narita)" },
-      { key: "budget", label: "Budget", placeholder: "e.g. under $25 or 'comfort'", example: "under $25" },
-    ],
-    whenToUse: [
-      "When deciding between taxi/ride-hail, train, bus, or pre-booked transfers",
-      "When traveling with luggage or a group",
-      "When you want a fast choice without regret",
-    ],
-    promptTemplate: `I'm arriving at {{airport}} and need to get to the city center. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me compare options and pick the best one for my situation.
-
-1. Options overview: List main options (ride-hailing, taxi, pre-booked transfer, shuttle/bus, train/metro). Include typical cost range and time.
-
-2. Fillable comparison table: Option | Cost | Time | Comfort | Reliability | Late-night friendliness | Notes.
-
-3. Decision rules: Give a quick decision tree based on party size, luggage, arrival time, and budget.
-
-4. Suggest 1–2 follow-up prompts after I tell you my arrival time, hotel area, and luggage count.`,
-  },
-
-  // ── Planning ─────────────────────────────────────────────────────────
-  {
-    id: "travel-budget-planner",
-    title: "Build a trip budget you can actually stick to",
-    summary:
-      "Create a detailed trip budget with clear assumptions (prices, buffers, and optional upgrades) so you can stay in control.",
-    category: "Planning",
+      "Plan the best order to visit multiple cities, with realistic transit, timing, and a clear tradeoff analysis.",
+    category: "Itinerary",
     intent: "planning",
     purpose:
-      "Makes budgeting practical: track the big costs, add realistic buffers, and identify the few levers that save the most money.",
-    tags: ["budget", "planning", "worksheet", "savings"],
+      "Eliminates backtracking and wasted transit time by finding the optimal city order and allocating the right number of days per stop.",
+    tags: ["multi-city", "route", "transit", "optimization"],
     variables: [
+      { key: "cities", label: "Cities to visit", placeholder: "e.g. Bangkok, Chiang Mai, Krabi", example: "Bangkok, Chiang Mai, Krabi" },
+      { key: "days", label: "Total days available", placeholder: "e.g. 12", example: "12" },
       { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "destination", label: "Destination", placeholder: "e.g. Vietnam", example: "Vietnam" },
-      { key: "duration", label: "Trip duration (days)", placeholder: "e.g. 10", example: "10" },
-      { key: "travelers", label: "Number of travelers", placeholder: "e.g. 2", example: "2" },
-      { key: "currency", label: "Budget currency", placeholder: "e.g. USD", example: "USD" },
-      { key: "total_budget", label: "Total budget (optional)", placeholder: "e.g. 2500", example: "2500" },
+      { key: "pace", label: "Travel pace", placeholder: "packed / balanced / relaxed", example: "balanced" },
     ],
     whenToUse: [
-      "When planning a trip and you want a complete budget template",
-      "When you want to see where your money will really go",
-      "When you want a clear plan for saving without ruining the trip",
+      "When visiting 3+ cities and unsure of the best order",
+      "When you want to minimize wasted transit time",
+      "When you need help deciding how many days per city",
     ],
-    promptTemplate: `Create a detailed travel budget for a {{duration}}-day trip to {{destination}} for {{travelers}} people in {{currency}}. We're traveling as a {{party}} and our rough total budget is {{total_budget}} (if blank, assume mid-range and show options).
+    promptTemplate: `I want to visit these cities: {{cities}}. I have {{days}} total days, traveling as a {{party}}, and prefer a {{pace}} pace.
 
-1. Budget categories: Estimate ranges for flights, accommodation, food, local transport, activities, shopping, travel insurance, and misc. Give budget / mid-range / comfortable ranges.
+Design the optimal multi-city route:
 
-2. Assumptions block (editable): Create a section where I set assumptions like:
-   - Exchange rate buffer: __%
-   - Price-change buffer for flights/hotels: __%
-   - Baggage/seat add-ons: $__ (or __%)
-   - Transport daily average: $__
-   - “Nice to have” upgrades: $__
+1. RECOMMENDED ORDER: Suggest the best sequence and explain why (geography, flight routes, transit connections, day-of-week considerations).
 
-3. Master worksheet: Category | Estimated cost | Notes/assumptions | Where to save | Minimum acceptable option.
+2. DAYS PER CITY: Allocate days to each city based on what's there vs my pace preference. Explain your reasoning — what would I miss with fewer days, and what's diminishing returns with more?
 
-4. Biggest savings levers: Identify the top 3 ways to reduce cost without reducing enjoyment.
+3. CITY-TO-CITY TRANSIT: For each connection, compare options:
+   - Best option (speed + comfort + cost balance)
+   - Budget option
+   - Approximate cost and travel time for each
+   - Book-ahead requirements or tips
 
-5. Booking checklist: A short checklist to avoid budget blow-ups (fees, cancellations, upgrades, hidden costs).
+4. ARRIVAL/DEPARTURE STRATEGY: For each city, suggest what to do on arrival day (usually a half-day) and how to use the departure day efficiently.
 
-6. Suggest 2 follow-up prompts to refine the budget after I get real quotes.`,
+5. ALTERNATIVE ROUTE: Provide one alternative ordering with a clear explanation of what's different (e.g. "if you want to end at a beach" or "if this flight is cheaper").
+
+6. MASTER TIMELINE: A single visual timeline showing Day 1–{{days}} with city, key activity, and transit legs.`,
   },
   {
-    id: "seasonal-travel-deals",
-    title: "When to book flights and hotels for maximum savings",
+    id: "vibes-to-itinerary",
+    slug: "vibes-to-itinerary",
+    title: "Turn vibes into an itinerary",
     summary:
-      "A monitoring plan for seasonality, booking windows, and major sale periods—focused on real prices, not hype.",
-    category: "Planning",
-    intent: "strategy",
+      "Describe the feeling you want and get a concrete, bookable trip plan — no destination research needed.",
+    category: "Itinerary",
+    intent: "planning",
     purpose:
-      "Helps travelers time bookings intelligently by balancing price trends, flexibility, and predictable sale windows.",
-    tags: ["timing", "seasonality", "price alerts", "strategy"],
+      "Bridges the gap between 'I want a trip that feels like…' and a real, actionable itinerary with specific places and timing.",
+    tags: ["vibes", "creative", "inspiration", "personalized"],
     variables: [
+      { key: "vibe", label: "Describe the vibe you want", placeholder: "e.g. 'cozy cafes, old streets, wine at sunset, no crowds'", example: "cozy cafes, old streets, wine at sunset, no crowds" },
+      { key: "days", label: "Number of days", placeholder: "e.g. 5", example: "5" },
+      { key: "region", label: "Region or constraints", placeholder: "e.g. Southeast Asia / Europe / anywhere under 6h flight from Singapore", example: "Europe" },
+      { key: "budget", label: "Budget level", placeholder: "budget / mid-range / comfort / luxury", example: "mid-range" },
+      { key: "month", label: "Travel month", placeholder: "e.g. September", example: "September" },
+    ],
+    whenToUse: [
+      "When you know the feeling you want but not the destination",
+      "When you're tired of 'top 10' lists and want something personal",
+      "When you want AI to match your mood to a real trip",
+    ],
+    promptTemplate: `Here's the vibe I want for my next trip: "{{vibe}}"
+
+I have {{days}} days, prefer {{region}}, {{budget}} budget, traveling in {{month}}.
+
+Turn this vibe into a real, bookable itinerary:
+
+1. DESTINATION MATCH: Suggest 3 destinations that match this vibe. For each, give a 2-sentence pitch explaining WHY it fits and one honest caveat.
+
+2. TOP PICK — FULL ITINERARY: For your #1 recommendation, build a complete day-by-day plan:
+   - Each day has a theme that feeds the vibe
+   - Specific places, neighborhoods, and experiences (not generic "explore the old town")
+   - Meal spots that match the mood
+   - Best time of day for each activity
+   - Transition between activities (walking routes, scenic connections)
+
+3. VIBE PROTECTORS: Things that could kill the vibe (overcrowded spots, tourist traps, bad timing) and how to avoid them.
+
+4. BOOKING ESSENTIALS: The 3–5 things I should book ahead vs what to leave spontaneous.
+
+5. VIBE PLAYLIST: 5 moments that will feel exactly like what I described — the specific "you'll be sitting here, seeing this, feeling that" moments.`,
+  },
+  {
+    id: "rain-proof-backup-plan",
+    slug: "rain-proof-backup-plan",
+    title: "Make your plan rain-proof",
+    summary:
+      "Generate a weather-contingency layer for any trip — indoor alternatives, timing shifts, and rainy-day routes.",
+    category: "Itinerary",
+    intent: "planning",
+    purpose:
+      "Prevents a rained-out day from ruining the trip by providing pre-planned indoor alternatives that are genuinely enjoyable, not just fallbacks.",
+    tags: ["weather", "backup", "rain", "contingency"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Bali", example: "Bali" },
+      { key: "month", label: "Travel month", placeholder: "e.g. January", example: "January" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 7", example: "7" },
+      { key: "interests", label: "Interests", placeholder: "e.g. food, culture, photography", example: "food, culture, photography" },
+    ],
+    whenToUse: [
+      "When traveling during rainy or unpredictable weather season",
+      "When you want to avoid losing a full day to bad weather",
+      "When you want indoor alternatives that are actually exciting, not filler",
+    ],
+    promptTemplate: `I'm going to {{destination}} for {{days}} days in {{month}}. My interests are: {{interests}}.
+
+Build a weather-contingency plan:
+
+1. WEATHER BRIEFING: What should I realistically expect in {{month}}? Break it down — how many rainy days, what time rain usually hits, how long it lasts, temperature range.
+
+2. TIMING SHIFTS: Which outdoor activities are better moved to morning vs afternoon based on typical weather patterns? Create an "ideal weather schedule" vs "rainy day schedule."
+
+3. INDOOR ALTERNATIVES MAP: For each major neighborhood I'll visit, list 3–4 genuinely good indoor options:
+   - Not just museums — include markets, cooking classes, spas, workshops, cafes worth spending hours in
+   - Include approximate cost and time needed
+   - Flag which ones need advance booking
+
+4. RAINY DAY FULL ITINERARY: Build one complete "perfect rainy day" plan that's so good I'd almost hope for rain. Include meals.
+
+5. GEAR & LOGISTICS: What to pack and practical rain tips specific to this city (e.g. "taxis are impossible in rain — use this app instead").
+
+6. DECISION RULES: Simple morning check — "If it's raining at 8am, swap Plan A for Plan B" type rules for each day of the trip.`,
+  },
+
+  // ── Neighborhoods ─────────────────────────────────────────────────────
+  {
+    id: "best-area-to-stay",
+    slug: "best-area-to-stay",
+    title: "Find the best area to stay",
+    summary:
+      "Compare neighborhoods head-to-head so you pick the area that matches your style, budget, and plans.",
+    category: "Stays",
+    intent: "comparison",
+    purpose:
+      "Replaces hours of Reddit/blog research with a structured comparison of neighborhoods based on what actually matters to your trip.",
+    tags: ["neighborhoods", "where to stay", "comparison", "accommodation"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Bangkok", example: "Bangkok" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
+      { key: "priorities", label: "What matters most", placeholder: "e.g. walkability, nightlife, food, quiet, central", example: "walkability, food, central" },
+      { key: "budget", label: "Nightly accommodation budget", placeholder: "e.g. $80–120/night", example: "$80–120/night" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 5", example: "5" },
+    ],
+    whenToUse: [
+      "When you don't know which neighborhood to book in",
+      "When Reddit threads give conflicting advice",
+      "When you want a fast comparison based on your actual priorities",
+    ],
+    promptTemplate: `I'm spending {{days}} days in {{destination}}, traveling as a {{party}}, with a nightly budget around {{budget}}. What matters most to me: {{priorities}}.
+
+Help me pick the best neighborhood:
+
+1. TOP 4–5 NEIGHBORHOODS: For each area, provide:
+   - Personality in one sentence (the honest vibe, not marketing copy)
+   - Best for (traveler type / trip style)
+   - Walkability and transit access
+   - Food & nightlife quality
+   - Safety and comfort level
+   - Typical accommodation price range
+   - Honest downside
+
+2. COMPARISON TABLE: Create a compact table scoring each area (1–5) on: Location, Food, Nightlife, Transit, Safety, Value, Quiet/Charm. Highlight the winner for MY priorities.
+
+3. MY TOP PICK: Based on my priorities, recommend one area with a specific explanation of why it wins.
+
+4. WHERE TO BOOK: Suggest the exact sub-area or streets within that neighborhood (e.g. "stay near Thonglor Soi 13–17 for the best mix of restaurants and quiet side streets").
+
+5. RUNNER-UP: A second option that's better if I value [X] more — explain the tradeoff clearly.`,
+  },
+  {
+    id: "neighborhood-walking-guide",
+    slug: "neighborhood-walking-guide",
+    title: "Neighborhood deep-dive walking guide",
+    summary:
+      "Explore one neighborhood like a local — a curated walking route with stops, timing, and insider tips.",
+    category: "Stays",
+    intent: "planning",
+    purpose:
+      "Turns a neighborhood name into a curated walking experience with specific stops, local context, and the kind of knowledge you'd only get from a resident.",
+    tags: ["walking", "neighborhood", "local", "explore"],
+    variables: [
+      { key: "neighborhood", label: "Neighborhood name", placeholder: "e.g. Shimokitazawa, Tokyo", example: "Shimokitazawa, Tokyo" },
+      { key: "hours", label: "Hours available", placeholder: "e.g. 3–4", example: "3–4" },
+      { key: "interests", label: "Interests", placeholder: "e.g. vintage shops, coffee, street art", example: "vintage shops, coffee, street art" },
+      { key: "month", label: "Travel month", placeholder: "e.g. April", example: "April" },
+    ],
+    whenToUse: [
+      "When you want to really experience one neighborhood (not just pass through)",
+      "When you have a half-day to fill and want a curated walk",
+      "When you want the kind of tips a local friend would give you",
+    ],
+    promptTemplate: `I want to explore {{neighborhood}} in about {{hours}} hours, visiting in {{month}}. My interests: {{interests}}.
+
+Create a neighborhood deep-dive walking guide:
+
+1. NEIGHBORHOOD BRIEFING: In 3–4 sentences, explain the character of this area — who lives here, what it's known for, and the best time of day to visit.
+
+2. WALKING ROUTE: Create a numbered route scaled to the time I have:
+   - Each stop: what it is, why it matters, how long to spend
+   - Walking time between stops
+   - The route should flow logically (no backtracking)
+   - Mix of "must-see" and "only locals know" spots
+
+3. FOOD & DRINK STOPS: Weave in 2–3 specific places to eat or drink along the route. For each: what to order, price range, and why it's special.
+
+4. PHOTO SPOTS: Flag 2–3 spots along the route with the best photo opportunities and the ideal time/angle.
+
+5. LOCAL ETIQUETTE: Any neighborhood-specific norms (e.g. "this market doesn't allow photos" or "shops open late here").
+
+6. MAP DIRECTIONS: Describe the route so clearly that I could follow it without GPS — use landmarks, turns, and street names.`,
+  },
+  {
+    id: "area-comparison-by-type",
+    slug: "area-comparison-by-type",
+    title: "Compare areas for your traveler type",
+    summary:
+      "Get a personalized neighborhood ranking based on whether you're a foodie, nightlife lover, family, or culture seeker.",
+    category: "Stays",
+    intent: "comparison",
+    purpose:
+      "Cuts through generic 'best neighborhood' advice by ranking areas specifically for your traveler archetype and trip priorities.",
+    tags: ["comparison", "personalized", "traveler type", "ranking"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Lisbon", example: "Lisbon" },
+      { key: "type", label: "Traveler type", placeholder: "e.g. foodie / nightlife / family / culture / digital nomad", example: "foodie" },
+      { key: "budget", label: "Budget level", placeholder: "budget / mid-range / comfort", example: "mid-range" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 5", example: "5" },
+      { key: "month", label: "Travel month", placeholder: "e.g. October", example: "October" },
+    ],
+    whenToUse: [
+      "When generic 'best neighborhood' lists don't match your style",
+      "When you want areas ranked specifically for your interests",
+      "When you want to understand the real tradeoffs between areas",
+    ],
+    promptTemplate: `I'm a {{type}} traveler heading to {{destination}} for {{days}} days in {{month}}, on a {{budget}} budget.
+
+Rank the neighborhoods for my traveler type:
+
+1. TOP 5 AREAS RANKED: Rank the best neighborhoods specifically for a {{type}} traveler. For each:
+   - Why it's ranked here (specific to my type, not generic)
+   - The single best thing about it for someone like me
+   - The honest downside
+   - One specific spot/experience I'd love in this area
+
+2. HEAD-TO-HEAD: Take the top 2 areas and do a detailed comparison — what's the real difference in daily experience? Paint a picture of "a typical day staying here" for each.
+
+3. AVOID LIST: 1–2 neighborhoods that look good online but would disappoint a {{type}} traveler, and why.
+
+4. HYBRID STRATEGY: If I have 5+ days, should I split between 2 neighborhoods? Which combo works best and why?
+
+5. INSIDER MOVE: One neighborhood that's not in most guides but is perfect for a {{type}} traveler — explain why it's underrated.`,
+  },
+
+  // ── Food & Drink ──────────────────────────────────────────────────────
+  {
+    id: "food-crawl-route",
+    slug: "food-crawl-route",
+    title: "Create a food crawl route",
+    summary:
+      "A curated eating route through a city or neighborhood — paced so you can actually eat everything.",
+    category: "Food & Drink",
+    intent: "planning",
+    purpose:
+      "Produces a realistic food crawl with portion-aware pacing, neighborhood flow, and the kind of specific recommendations (what to order, how to order) that generic lists miss.",
+    tags: ["food crawl", "street food", "route", "eating"],
+    variables: [
+      { key: "destination", label: "City or neighborhood", placeholder: "e.g. Penang, George Town", example: "Penang, George Town" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / friends", example: "friends" },
+      { key: "duration", label: "Duration", placeholder: "e.g. half-day / full-day", example: "half-day" },
+      { key: "dietary", label: "Dietary restrictions (if any)", placeholder: "e.g. none / vegetarian / halal / no shellfish", example: "none" },
+    ],
+    whenToUse: [
+      "When food is a main reason you're visiting",
+      "When you want a structured eating route (not just a list of restaurants)",
+      "When you want to eat like a local, not a tourist",
+    ],
+    promptTemplate: `Build a {{duration}} food crawl through {{destination}} for a {{party}} group. Dietary restrictions: {{dietary}}.
+
+1. FOOD CRAWL ROUTE (6–10 stops): For each stop:
+   - Name of the place (or stall/hawker description if unnamed)
+   - What to order (specific dishes, not "try the local food")
+   - Approximate cost per person
+   - How much to eat (small taste / half portion / full meal) — pace it so I'm not full by stop 3
+   - How to order (language tips, point-at-menu, queue etiquette)
+   - Walk time to next stop
+
+2. TIMING: Best time to start this crawl (some spots are morning-only, some are lunch peak, etc.). Flag any places that close early or have long queues.
+
+3. FOOD CONTEXT: For 2–3 key dishes, briefly explain why they matter here — the cultural/historical context that makes this food special in this city.
+
+4. DRINK PAIRINGS: Suggest local drinks to try between food stops (not just alcohol — local coffee, fresh juice, specialty drinks).
+
+5. BUDGET TOTAL: Estimated total cost per person for the full crawl.
+
+6. MUST-NOT-MISS: If I can only do 3 stops, which 3 and in what order?
+
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
+  },
+  {
+    id: "local-food-guide",
+    slug: "local-food-guide",
+    title: "Eat like a local (not a tourist)",
+    summary:
+      "Find the restaurants, stalls, and food experiences that locals actually eat at — organized by meal type and neighborhood.",
+    category: "Food & Drink",
+    intent: "planning",
+    purpose:
+      "Gets travelers out of TripAdvisor top-10 restaurants and into the places where locals go — with enough context to navigate confidently.",
+    tags: ["local food", "restaurants", "authentic", "guide"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Ho Chi Minh City", example: "Ho Chi Minh City" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 4", example: "4" },
+      { key: "food_style", label: "Food preferences", placeholder: "e.g. street food, seafood, vegetarian-friendly, fine dining", example: "street food, seafood" },
+      { key: "budget", label: "Food budget level", placeholder: "cheap eats / mid-range / splurge-worthy", example: "cheap eats" },
+    ],
+    whenToUse: [
+      "When you want to eat well without overpaying at tourist spots",
+      "When you want a meal plan organized by neighborhood and day",
+      "When you want to understand what and how locals eat",
+    ],
+    promptTemplate: `I'm in {{destination}} for {{days}} days. I love: {{food_style}}. Budget level: {{budget}}.
+
+Create a local food guide:
+
+1. FOOD CULTURE BRIEFING: In 5 bullet points, explain how locals eat in this city — meal timing, ordering customs, tipping, where to find the best food (hint: it's usually not the pretty restaurant).
+
+2. MUST-EAT DISHES: List the 8–10 dishes I absolutely must try, ranked by priority. For each: what it is, where to get the best version, and approximate cost.
+
+3. MEAL MAP (by day): For each day, suggest:
+   - Breakfast spot (with specific recommendation)
+   - Lunch spot
+   - Afternoon snack / cafe
+   - Dinner spot
+   - Late-night option (if the city has a late food culture)
+   Group meals by neighborhood to minimize travel between eating.
+
+4. TOURIST TRAPS TO SKIP: 3–5 popular restaurants that locals avoid and what to do instead.
+
+5. ORDERING CHEAT SHEET: Key food vocabulary, how to order at stalls/markets, pointing protocol, and payment norms.
+
+6. FOOD EXPERIENCES: 2–3 food experiences beyond restaurants (cooking class, market tour, farm visit, food-focused neighborhood walk).
+
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
+  },
+  {
+    id: "market-and-street-food-route",
+    slug: "market-and-street-food-route",
+    title: "Street food + market route builder",
+    summary:
+      "Plan a street food and market exploration route — with timing, best stalls, and practical navigation tips.",
+    category: "Food & Drink",
+    intent: "planning",
+    purpose:
+      "Makes street food and market exploration structured and confident — know exactly when to go, what to try, and how to navigate.",
+    tags: ["street food", "markets", "route", "hawker"],
+    variables: [
+      { key: "destination", label: "City or area", placeholder: "e.g. Taipei", example: "Taipei" },
+      { key: "market_type", label: "Market preference", placeholder: "e.g. night markets / morning markets / both", example: "night markets" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / friends", example: "couple" },
+      { key: "dietary", label: "Dietary restrictions (if any)", placeholder: "e.g. none / vegetarian / halal / no shellfish", example: "none" },
+    ],
+    whenToUse: [
+      "When markets and street food are a highlight of your trip",
+      "When you don't want to wander aimlessly and miss the best stalls",
+      "When you need practical tips for navigating markets confidently",
+    ],
+    promptTemplate: `I want to explore {{market_type}} in {{destination}}, traveling as a {{party}}. Dietary restrictions: {{dietary}}.
+
+Build a market and street food route:
+
+1. TOP 3 MARKETS/AREAS: Rank the best options for my preference. For each:
+   - Operating hours and best time to arrive
+   - What it's famous for
+   - How long to spend there
+   - How to get there
+
+2. STALL-BY-STALL ROUTE: For the #1 market, create a walk-through route with 8–12 recommended stalls:
+   - Stall name or landmark description
+   - What to order and approximate price
+   - Portion size guidance (taste / snack / meal)
+   - Any queue tips or ordering tricks
+
+3. MARKET NAVIGATION: Practical tips:
+   - Layout overview (where the food section is vs goods/clothing)
+   - Cash vs card
+   - What to bring (bags, wet wipes, water)
+   - Etiquette (tasting, bargaining, photos)
+
+4. TIMING STRATEGY: When to go for the best experience (avoid peak crowds but don't arrive too early/late for the best stalls).
+
+5. COMBINE WITH: What to pair the market visit with (nearby attractions, walking route, a good spot for drinks after).`,
+  },
+
+  // ── Routes ────────────────────────────────────────────────────────────
+  {
+    id: "sightseeing-route-builder",
+    slug: "sightseeing-route-builder",
+    title: "Build routes that actually work",
+    summary:
+      "A sightseeing route with transit, timing, and logical flow — no backtracking, no wasted time.",
+    category: "Routes",
+    intent: "planning",
+    purpose:
+      "Produces a route that respects geography, opening hours, crowd patterns, and energy levels — the kind of plan that feels effortless to follow.",
+    tags: ["sightseeing", "route", "transit", "planning"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Rome", example: "Rome" },
+      { key: "interests", label: "Interests", placeholder: "e.g. history, architecture, food, photos", example: "history, architecture, food" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
+      { key: "pace", label: "Pace preference", placeholder: "packed / balanced / relaxed", example: "balanced" },
+    ],
+    whenToUse: [
+      "When you want to see a lot without feeling rushed",
+      "When you need a route that connects stops logically",
+      "When you want transit figured out between every stop",
+    ],
+    promptTemplate: `Build a sightseeing route for {{destination}}. My interests: {{interests}}. Traveling as a {{party}} at a {{pace}} pace.
+
+1. THE ROUTE: Create a timed, numbered route from morning to evening:
+   - Each stop: name, why it's worth it, how long to spend
+   - Transit between stops: exact method (walk / metro line / bus #), time, and cost
+   - Crowd strategy: best arrival time to avoid lines
+   - No backtracking — the route should flow geographically
+
+2. ENERGY MANAGEMENT: Build in 2–3 natural rest points (cafe breaks, park sits, quiet spots). Place them where energy typically dips.
+
+3. MEALS ON-ROUTE: Breakfast, lunch, and dinner spots that fall naturally along the route. Specific names, what to order, and price range.
+
+4. SKIP-THE-LINE TIPS: For any popular stop, suggest how to reduce wait time (pre-booking, early arrival, lesser-known entrance).
+
+5. PHOTO TIMELINE: Flag the 3 best photo moments and the ideal time of day for each (golden hour, less crowded, best light angle).
+
+6. FLEXIBILITY: Mark which stops are "cut first" if I'm running behind, and which are non-negotiable.
+
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
+  },
+  {
+    id: "day-trip-planner",
+    slug: "day-trip-planner",
+    title: "Plan a perfect day trip from the city",
+    summary:
+      "Find the best day trip from your base city — with realistic timing, transport, and a full itinerary for the destination.",
+    category: "Routes",
+    intent: "comparison",
+    purpose:
+      "Compares day trip options with realistic transit timing and provides a complete plan for the best one — so you don't waste half the day getting there.",
+    tags: ["day trip", "excursion", "transit", "comparison"],
+    variables: [
+      { key: "base_city", label: "Base city", placeholder: "e.g. Barcelona", example: "Barcelona" },
+      { key: "interests", label: "Interests for the day trip", placeholder: "e.g. nature, wine, small towns, beaches, history", example: "nature, small towns" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "friends" },
+      { key: "transport", label: "Transport preference", placeholder: "e.g. train only / car ok / any", example: "train only" },
+      { key: "month", label: "Travel month", placeholder: "e.g. June", example: "June" },
+    ],
+    whenToUse: [
+      "When you have a free day and want to escape the city",
+      "When you're not sure which day trip is worth the travel time",
+      "When you want a complete plan, not just 'go to X'",
+    ],
+    promptTemplate: `I'm based in {{base_city}} and want to do a day trip in {{month}}. Interests: {{interests}}. Traveling as a {{party}}. Transport: {{transport}}.
+
+1. TOP 3 DAY TRIP OPTIONS: Compare them:
+   - Travel time (each way) and method
+   - What you'll actually see and do
+   - Best for what kind of traveler
+   - Cost (transport + activities + food)
+   - Honest downside (is it actually worth the transit time?)
+
+2. COMPARISON TABLE: Destination | Travel time | Cost | Highlight | Downside | Best for.
+
+3. #1 PICK — FULL PLAN: For the recommended day trip, build a complete timeline:
+   - What time to leave and which train/bus/route
+   - Arrival plan (what to do first)
+   - 3–5 hour itinerary on the ground
+   - Where to eat (with specific recommendation)
+   - Return timing (last comfortable departure)
+
+4. BOOKING NEEDS: What to book ahead vs what to wing. Include transport ticket tips.
+
+5. PLAN B: If the #1 pick doesn't work out (weather, closures), which alternative requires the least replanning?`,
+  },
+  {
+    id: "transit-smart-itinerary",
+    slug: "transit-smart-itinerary",
+    title: "Plan around opening hours + transit",
+    summary:
+      "Build an itinerary that respects real-world constraints — opening hours, transit schedules, and reservation requirements.",
+    category: "Routes",
+    intent: "planning",
+    purpose:
+      "Prevents the classic mistake of arriving at a closed venue or spending 45 minutes on transit that could have been 10 with better sequencing.",
+    tags: ["transit", "opening hours", "logistics", "timing"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Kyoto", example: "Kyoto" },
+      { key: "places", label: "Places I want to visit", placeholder: "e.g. Fushimi Inari, Arashiyama bamboo grove, Kinkaku-ji, Nishiki Market", example: "Fushimi Inari, Arashiyama bamboo grove, Kinkaku-ji, Nishiki Market" },
+      { key: "day", label: "Day of the week", placeholder: "e.g. Tuesday", example: "Tuesday" },
+    ],
+    whenToUse: [
+      "When you have a list of places but need help with the optimal order",
+      "When opening hours, closures, and transit could ruin a bad plan",
+      "When you want to minimize time on transit and maximize time at destinations",
+    ],
+    promptTemplate: `I want to visit these places in {{destination}}: {{places}}. The day of the week will be {{day}}.
+
+Optimize my day around real-world constraints:
+
+1. OPENING HOURS CHECK: For each place, list:
+   - Opening and closing times
+   - Whether it's closed or has reduced hours on certain days
+   - Whether tickets/reservations are needed
+   - Best time to arrive to avoid crowds
+
+2. OPTIMAL SEQUENCE: Reorder my list for the best flow. Show:
+   - The recommended order
+   - Transit method between each stop (specific line/bus, walking time)
+   - Total transit time vs "wasted" time if I went in my original order
+
+3. TIMED SCHEDULE: Build a timeline from morning to evening:
+   Time | Place | Duration | Transit to next stop
+   Build in realistic buffer time (not a minute-to-minute fantasy).
+
+4. WHAT TO DROP: If the day is too packed, which place should I cut and why? What's the 80/20 version of this day?
+
+5. CONTINGENCY: If one place is unexpectedly closed or overcrowded, what should I do instead nearby?
+
+For every specific place you recommend, include one way I can verify it's still open/accurate (e.g. Google Maps search term, official website, or "search for [X] on [platform]").`,
+  },
+
+  // ── Discovery ─────────────────────────────────────────────────────────
+  {
+    id: "hidden-gems-finder",
+    slug: "hidden-gems-finder",
+    title: "Find hidden gems (skip the tourist traps)",
+    summary:
+      "Discover the places locals love that don't appear in guidebooks — with specific names, directions, and context.",
+    category: "Discovery",
+    intent: "planning",
+    purpose:
+      "Goes beyond 'off the beaten path' clichés to surface genuinely interesting, lesser-known spots with the context needed to appreciate them.",
+    tags: ["hidden gems", "off-beat", "local", "authentic"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Seoul", example: "Seoul" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 5", example: "5" },
+      { key: "interests", label: "Interests", placeholder: "e.g. art, coffee, architecture, nature, vintage", example: "art, coffee, vintage" },
+    ],
+    whenToUse: [
+      "When you've already seen the top-10 lists and want something different",
+      "When you want the places a local friend would take you",
+      "When you value authenticity over popularity",
+    ],
+    promptTemplate: `I'm spending {{days}} days in {{destination}}. My interests: {{interests}}. I've already seen the standard tourist lists — give me the hidden gems.
+
+1. 10 HIDDEN GEMS: For each:
+   - Name and exact location (neighborhood + nearest landmark or transit stop)
+   - What makes it special (be specific, not just "it's charming")
+   - Best time to visit
+   - How to find it (some great spots are literally down an alley)
+   - Who would love it / who would be disappointed
+
+2. TOURIST TRAP SWAPS: Take 3 famous attractions and suggest a lesser-known alternative that delivers a similar (or better) experience:
+   - Famous spot → Hidden alternative → Why it's as good or better
+
+3. LOCAL HANGOUTS: 3 places where locals actually spend their weekends — not "local" restaurants with menus in 5 languages.
+
+4. SEASONAL SECRETS: 2–3 things happening during my visit that most tourists don't know about (markets, festivals, seasonal food, neighborhood events).
+
+5. DISCOVERY WALK: One 2-hour walking route through a non-touristy area that captures the real spirit of the city.`,
+  },
+  {
+    id: "local-experiences-planner",
+    slug: "local-experiences-planner",
+    title: "Plan local experiences (not in guidebooks)",
+    summary:
+      "Find unique, immersive experiences that connect you to local culture — workshops, community events, and real interactions.",
+    category: "Discovery",
+    intent: "planning",
+    purpose:
+      "Surfaces the kind of experiences that make a trip memorable — not just sights to see, but things to do that create real connection with a place.",
+    tags: ["experiences", "immersive", "culture", "local"],
+    variables: [
+      { key: "destination", label: "Destination city", placeholder: "e.g. Chiang Mai", example: "Chiang Mai" },
       { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "solo" },
-      { key: "destination", label: "Destination", placeholder: "e.g. Japan", example: "Japan" },
-      { key: "budget", label: "Budget", placeholder: "e.g. 'tight' / 'mid-range' / 'comfort'", example: "mid-range" },
+      { key: "interests", label: "Experience interests", placeholder: "e.g. craft, cooking, music, nature, spirituality", example: "craft, cooking, nature" },
+      { key: "budget", label: "Budget level", placeholder: "budget / mid-range / comfort", example: "mid-range" },
     ],
     whenToUse: [
-      "When your travel dates are flexible and you want the best value",
-      "When planning months ahead and you want a monitoring plan",
-      "When deciding whether to wait for a sale or book now",
+      "When you want more than sightseeing",
+      "When you want to interact with local culture, not just observe it",
+      "When you're looking for the experiences you'll tell stories about",
     ],
-    promptTemplate: `I want to travel to {{destination}} and have flexible dates. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me build a monitoring plan to book at the best time for price and value.
+    promptTemplate: `I'm visiting {{destination}} as a {{party}} traveler. My interests: {{interests}}. Budget: {{budget}}.
 
-1. Destination seasonality: Identify peak/shoulder/low seasons. When are flights/hotels cheapest, and what’s the weather tradeoff?
+Find unique local experiences:
 
-2. General booking windows: Share common patterns for flights vs hotels (how far out to watch, when last-minute works, when it doesn’t).
+1. TOP 8 EXPERIENCES: For each:
+   - What it is and what you'll actually do
+   - Why it's special (cultural context, not marketing copy)
+   - Duration and approximate cost
+   - How to book or arrange it
+   - Skill/fitness level needed
 
-3. Major sale periods to watch: List common promo windows (e.g., mid-year, 9.9/10.10/11.11, Black Friday/Cyber Monday, year-end) as “times when many travel sites run discounts”—no promises.
+2. CATEGORIES:
+   - 2 hands-on craft/creative experiences (workshop, class, studio visit)
+   - 2 food/drink experiences (beyond restaurants — think farm visits, fermentation, foraging)
+   - 2 nature/outdoor experiences (not the obvious hike everyone does)
+   - 2 cultural immersion experiences (community events, local ceremonies, neighborhood life)
 
-4. Monitoring checklist: Price alerts, a simple tracking spreadsheet, and a weekly routine (what to check and how often).
+3. ETHICAL CHECK: Flag any experiences that might be exploitative or culturally insensitive, and suggest respectful alternatives.
 
-5. Decision framework: How to decide “book now” vs “wait,” including a breakeven calculation (how much price increase would wipe out a discount).
+4. COMBINATION PLAN: Show how to fit 3–4 of these into a single day alongside regular sightseeing.
 
-6. Suggest 2 follow-up prompts for when I’m close to booking.`,
+5. SPONTANEOUS OPTIONS: 2–3 experiences that don't need booking — things I can stumble into if the moment is right.`,
   },
   {
-    id: "travel-rewards-checklist",
-    title: "Pre-booking savings SOP",
+    id: "cultural-deep-dive",
+    slug: "cultural-deep-dive",
+    title: "Cultural deep-dive: understand before you visit",
     summary:
-      "A printable SOP for booking travel smarter: compare properly, avoid fee traps, and keep receipts and policies organized.",
-    category: "Planning",
+      "Get the cultural context that transforms a trip from 'seeing places' to 'understanding them' — history, customs, and social norms.",
+    category: "Discovery",
+    intent: "planning",
+    purpose:
+      "Gives travelers the background knowledge that makes every sight, meal, and interaction more meaningful — like having a knowledgeable local friend briefing you before the trip.",
+    tags: ["culture", "history", "customs", "context"],
+    variables: [
+      { key: "destination", label: "Destination country or city", placeholder: "e.g. Japan", example: "Japan" },
+      { key: "interests", label: "Cultural interests", placeholder: "e.g. religion, food history, architecture, social customs", example: "food history, social customs" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 10", example: "10" },
+    ],
+    whenToUse: [
+      "When you want to understand a place, not just photograph it",
+      "When cultural context would make your trip more meaningful",
+      "When you want to avoid unintentional cultural faux pas",
+    ],
+    promptTemplate: `I'm visiting {{destination}} for {{days}} days. My cultural interests: {{interests}}.
+
+Give me a cultural deep-dive:
+
+1. CULTURAL BRIEFING (the stuff guidebooks skip):
+   - 5 things that will surprise a first-time visitor
+   - The social norms that matter most (greetings, shoes, dining, public behavior)
+   - Common tourist behaviors that locals find rude or awkward
+   - The local relationship with tourism (welcomed? tolerated? complicated?)
+
+2. HISTORY IN 5 MINUTES: The 5 historical events/periods that shaped what I'll see today. Keep it engaging, not textbook.
+
+3. FOOD CULTURE: The story behind the food — why they eat what they eat, meal customs, and 3 dishes with fascinating backstories.
+
+4. CULTURAL EXPERIENCES: 5 ways to engage with local culture respectfully:
+   - What to do (temple visits, ceremonies, markets, community events)
+   - How to participate without being intrusive
+   - What to wear, bring, or know
+
+5. CONVERSATION STARTERS: 3–5 topics that locals love talking about (and 2 topics to avoid).
+
+6. MEDIA PREP: 1 film, 1 book, and 1 podcast/article to consume before the trip that will make everything click.`,
+  },
+
+  // ── Smart Planning ────────────────────────────────────────────────────
+  {
+    id: "compare-two-destinations",
+    slug: "compare-two-destinations",
+    title: "Compare options with clear trade-offs",
+    summary:
+      "Can't decide between two destinations? Get a structured comparison based on your trip priorities.",
+    category: "Smart Planning",
+    intent: "comparison",
+    purpose:
+      "Ends destination paralysis by comparing two places across the dimensions that actually matter for YOUR trip, not generic rankings.",
+    tags: ["comparison", "destinations", "decision", "trade-offs"],
+    variables: [
+      { key: "option_a", label: "Option A", placeholder: "e.g. Bali", example: "Bali" },
+      { key: "option_b", label: "Option B", placeholder: "e.g. Phuket", example: "Phuket" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 7", example: "7" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
+      { key: "priorities", label: "What matters most", placeholder: "e.g. food, beaches, culture, nightlife, budget", example: "food, beaches, budget" },
+      { key: "month", label: "Travel month", placeholder: "e.g. August", example: "August" },
+    ],
+    whenToUse: [
+      "When you're torn between two destinations",
+      "When you want a comparison based on YOUR priorities, not generic rankings",
+      "When you need a clear recommendation with honest trade-offs",
+    ],
+    promptTemplate: `I'm choosing between {{option_a}} and {{option_b}} for a {{days}}-day trip in {{month}}. Traveling as a {{party}}. What matters most to me: {{priorities}}.
+
+Compare them head-to-head:
+
+1. COMPARISON TABLE: Score each destination (1–5) on the dimensions that matter for this type of trip (e.g. food, nature, culture, nightlife, value, safety, ease of travel, weather, uniqueness). Pick the most relevant dimensions for my priorities.
+
+2. DEEP COMPARISON (by my priorities): For each priority I listed, give a 2–3 sentence comparison explaining which destination wins and why. Be specific, not generic.
+
+3. DAILY COST COMPARISON:
+   Budget | Mid-range | Comfortable
+   Show estimated daily costs for accommodation, food, transport, and activities.
+
+4. WEATHER REALITY: For {{month}} specifically — what will the weather actually be like at each destination? Flag any dealbreakers (monsoon, extreme heat, etc.).
+
+5. ITINERARY SNAPSHOT: For each destination, describe what a typical "best day" looks like — this often reveals which place you'd actually enjoy more.
+
+6. MY PICK: Based on my priorities, make a clear recommendation. Then tell me: "Choose the other one if ___" (the one scenario where it flips).`,
+  },
+  {
+    id: "trip-budget-planner",
+    slug: "trip-budget-planner",
+    title: "Get a trip budget in minutes",
+    summary:
+      "Build a realistic trip budget with clear estimates, savings levers, and a simple tracking template.",
+    category: "Smart Planning",
+    intent: "planning",
+    purpose:
+      "Turns vague budget anxiety into a clear, editable plan — with realistic estimates based on destination, style, and season.",
+    tags: ["budget", "planning", "cost estimate", "savings"],
+    variables: [
+      { key: "destination", label: "Destination", placeholder: "e.g. Vietnam", example: "Vietnam" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 10", example: "10" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
+      { key: "style", label: "Travel style", placeholder: "budget / mid-range / comfort / luxury", example: "mid-range" },
+      { key: "origin", label: "Flying from", placeholder: "e.g. Singapore", example: "Singapore" },
+    ],
+    whenToUse: [
+      "When you need a realistic cost estimate before committing to a trip",
+      "When you want to know where your money will actually go",
+      "When you want clear strategies to save without downgrading the experience",
+    ],
+    promptTemplate: `Estimate the total cost for a {{days}}-day trip to {{destination}} for a {{party}}, {{style}} style, flying from {{origin}}.
+
+1. COST BREAKDOWN: Estimate realistic ranges for:
+   - Flights (round-trip, economy)
+   - Accommodation (per night and total)
+   - Food (per day: budget / mid / nice meals)
+   - Local transport (per day)
+   - Activities & attractions
+   - Travel insurance
+   - SIM/connectivity
+   - Miscellaneous (shopping, tips, unexpected)
+   Total estimate: $LOW – $HIGH per person
+
+2. BUDGET TABLE:
+   Category | Budget option | Mid-range option | Comfort option | Notes
+   Fill in realistic numbers for this specific destination.
+
+3. TOP 5 SAVINGS LEVERS: The highest-impact ways to reduce cost without hurting the experience. Rank by savings potential.
+
+4. HIDDEN COSTS: 5 costs that travelers to {{destination}} commonly forget (visa, departure tax, tipping norms, tourist pricing, scam buffer).
+
+5. BOOKING TIMELINE: When to book each component for the best price.
+
+6. SIMPLE TRACKER: A template I can copy to track actual spending vs budget day by day.`,
+  },
+  {
+    id: "packing-logistics-checklist",
+    slug: "packing-logistics-checklist",
+    title: "Pre-trip logistics + packing checklist",
+    summary:
+      "A destination-specific checklist covering documents, packing, bookings, and the stuff most people forget.",
+    category: "Smart Planning",
     intent: "checklist",
     purpose:
-      "Creates a repeatable workflow that reduces mistakes and saves money through better comparisons, cleaner checkout, and better documentation.",
-    tags: ["checklist", "SOP", "booking", "savings"],
+      "Prevents pre-trip stress and forgotten essentials by providing a prioritized, destination-aware checklist with real deadlines.",
+    tags: ["packing", "checklist", "logistics", "preparation"],
     variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "family" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $3000 total or 'mid-range'", example: "$3000 total" },
+      { key: "destination", label: "Destination", placeholder: "e.g. Japan", example: "Japan" },
+      { key: "days", label: "Trip length (days)", placeholder: "e.g. 14", example: "14" },
+      { key: "month", label: "Travel month", placeholder: "e.g. April", example: "April" },
+      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
     ],
     whenToUse: [
-      "Before any travel booking to avoid expensive mistakes",
-      "When you want a consistent workflow you can reuse every trip",
-      "When you’re coordinating bookings for multiple people",
+      "When you're 1–4 weeks before departure and want to make sure nothing's missed",
+      "When you want a packing list specific to your destination and season",
+      "When you want a timeline for pre-trip tasks (visa, bookings, etc.)",
     ],
-    promptTemplate: `Create a comprehensive, printable Standard Operating Procedure (SOP) I should follow before and after every travel booking to save money and reduce problems. Tailor it for a {{party}} trip with a rough budget of {{budget}}.
+    promptTemplate: `Create a pre-trip checklist for {{days}} days in {{destination}} in {{month}}, traveling as a {{party}}.
 
-BEFORE BOOKING:
-1. Compare properly: Compare at least 3 sources and ensure you’re comparing the same thing (same dates, baggage, room type, cancellation terms).
-2. Fee audit: Check taxes/fees, resort/city fees, payment/FX fees, baggage/seat add-ons, and any mandatory extras.
-3. Promo discipline: If using a promo code, confirm eligibility, minimum spend, excluded dates/categories, and whether it changes cancellation terms.
-4. Flexibility check: Decide upfront how much flexibility you need (refundable vs non-refundable) and what you’re willing to risk.
-5. Documentation: Save screenshots/receipts and the cancellation policy page for anything expensive or non-refundable.
+1. DOCUMENTS & ADMIN (4 weeks before):
+   - Visa requirements and processing time
+   - Passport validity rules
+   - Travel insurance recommendation
+   - Important numbers/contacts to save
+   - Digital copies of everything
 
-DURING BOOKING:
-6. Clean checkout: Re-check currency, pre-ticked add-ons, traveler names, passport requirements, and contact details.
-7. One-session rule: Avoid changing devices/tabs mid-checkout; confirm you get a final confirmation page.
+2. BOOKINGS & RESERVATIONS (2–3 weeks before):
+   - What MUST be booked ahead (restaurants, experiences, transit passes)
+   - What can be left flexible
+   - Apps to download before the trip
 
-AFTER BOOKING:
-8. Confirmation audit: Confirm email received, booking reference, total charged, and policy deadlines.
-9. Calendar reminders: Add reminders for free-cancellation deadlines, check-in windows, and any required pre-arrival steps.
-10. Record-keeping: Keep a simple tracker: Date | Provider | Amount | Policy type | Deadline | Notes.
+3. MONEY & CONNECTIVITY:
+   - Cash vs card norms for this destination
+   - Best way to get local currency
+   - SIM/eSIM recommendation
+   - Payment apps locals use
 
-Format this as a one-page checklist with checkboxes.`,
+4. PACKING LIST (destination + season specific):
+   - Weather-appropriate clothing (be specific for {{month}})
+   - Footwear (based on typical activities)
+   - Destination-specific items most people forget
+   - Tech & charging (adaptor type, power bank needs)
+   - NOT worth packing (things to buy there cheaper)
+
+5. DAY-BEFORE CHECKLIST: The 10 things to confirm/do the day before departure.
+
+6. AIRPORT & ARRIVAL: First-hour game plan — what to do between landing and reaching your accommodation.`,
   },
-
-  // ── Cards & Miles ────────────────────────────────────────────────────
   {
-    id: "travel-card-comparison",
-    title: "Best travel cards for fees, perks, and protections",
+    id: "compare-travel-options",
+    slug: "compare-travel-options",
+    title: "Compare any two travel options side-by-side",
     summary:
-      "Compare travel cards by FX fees, travel insurance, lounge access, and how you book—so your payments help you travel smarter.",
-    category: "Cards & Miles",
+      "A structured comparison framework for any travel decision — hotels, flights, neighborhoods, tours, or routes.",
+    category: "Smart Planning",
     intent: "comparison",
     purpose:
-      "Shifts the focus from “earning” to smart travel payments: lower fees, better protections, and perks that actually reduce trip friction and cost.",
-    tags: ["credit cards", "fees", "protections", "comparison"],
+      "Provides a reusable comparison framework that surfaces the real trade-offs in any travel decision, not just the price difference.",
+    tags: ["comparison", "decision", "trade-offs", "framework"],
     variables: [
-      { key: "country", label: "Country of residence", placeholder: "e.g. Singapore", example: "Singapore" },
-      { key: "frequency", label: "Trips per year", placeholder: "e.g. 4", example: "4" },
+      { key: "decision", label: "What are you comparing?", placeholder: "e.g. Hotel A vs Hotel B / Train vs flight to X / AirBnB vs hotel", example: "Hotel A vs Hotel B" },
+      { key: "option_a", label: "Option A details", placeholder: "Paste details, link, or describe", example: "Hotel near old town, $95/night, 4-star, no breakfast" },
+      { key: "option_b", label: "Option B details", placeholder: "Paste details, link, or describe", example: "Airbnb in trendy area, $75/night, full kitchen, 15min from center" },
+      { key: "priorities", label: "What matters most to you", placeholder: "e.g. location, price, flexibility, comfort, convenience", example: "location, flexibility, value" },
     ],
     whenToUse: [
-      "When choosing a travel card based on fees and protections",
-      "When comparing annual fees vs perks you’ll actually use",
-      "When you travel internationally and care about FX costs",
+      "When you have two options and can't decide",
+      "When the price isn't the whole story and you need to see real trade-offs",
+      "When you want a clear recommendation, not just a list of pros and cons",
     ],
-    promptTemplate: `I live in {{country}} and travel about {{frequency}} times per year. Help me choose a travel credit card that helps me save money and reduce travel stress.
+    promptTemplate: `I need to decide: {{decision}}
 
-IMPORTANT: Credit card products change frequently. Use a structured comparison, but remind me to verify all details with issuers before applying.
+Option A: {{option_a}}
+Option B: {{option_b}}
 
-1. Inputs I should define:
-   - Annual travel spend: $__
-   - Typical bookings: flights / hotels / rides / tours (which are biggest?)
-   - Countries/currencies I spend in most: __
-   - Priorities: low FX fees, travel insurance, lounge access, hotel perks, customer support
+My priorities: {{priorities}}
 
-2. Comparison framework (up to 5 cards): Card | Annual fee | FX fees | Travel insurance highlights | Lounge access | Key perks | Best for.
+Compare them:
 
-3. Real-world scenarios: For each card, explain how it helps in scenarios like cancellations, delays, lost baggage, rental car damage, or disputes.
+1. SIDE-BY-SIDE TABLE: Compare across all relevant dimensions:
+   Factor | Option A | Option B | Winner
+   Include: cost, location, convenience, flexibility, comfort, hidden costs, and any dimension specific to this type of decision.
 
-4. Value calculator template: A worksheet to estimate whether the annual fee is worth it based on perks you’ll actually use.
+2. TRUE COST: Go beyond sticker price. Factor in transport costs (is Option B cheap but far?), included amenities, cancellation risk, and time cost.
 
-5. Suggest 2 follow-up prompts for narrowing to 2 final choices.`,
+3. PRIORITY-WEIGHTED ANALYSIS: Score each option on MY stated priorities. Weight the scores — not everything matters equally.
+
+4. SCENARIO TEST: "Choose A if ___" and "Choose B if ___" — give me the conditions where each option wins.
+
+5. WHAT I'D MISS: For each option, what's the biggest thing I'd give up by choosing the other?
+
+6. RECOMMENDATION: Make a clear call for my situation, with one caveat that would flip the decision.`,
   },
   {
-    id: "miles-vs-cashback",
-    title: "Points vs cash savings: which fits your travel style?",
+    id: "trip-plan-in-minutes",
+    slug: "trip-plan-in-minutes",
+    title: "Get a trip plan in minutes",
     summary:
-      "A math-driven comparison that helps you decide whether points/miles or simple discounts and statement credits are better for you.",
-    category: "Cards & Miles",
-    intent: "analysis",
+      "Don't want to use five prompts? Get an 80%-ready trip plan in one shot — where to stay, what to do, what to eat, and what it'll cost.",
+    category: "Smart Planning",
+    intent: "planning",
     purpose:
-      "Keeps it practical: compare strategies with clear assumptions so you choose the one that saves you more, with less effort and fewer surprises.",
-    tags: ["points", "cash savings", "analysis", "strategy"],
+      "The fastest path from 'I want to go somewhere' to a bookable plan. Not the most detailed, but covers every angle — itinerary, accommodation, food, budget, logistics — in a single response you can start acting on immediately.",
+    tags: ["quick plan", "comprehensive", "one-shot", "overview"],
     variables: [
-      { key: "monthly_spend", label: "Monthly travel spend (USD)", placeholder: "e.g. 500", example: "500" },
-    ],
-    whenToUse: [
-      "When deciding between a points-focused card vs a cash-savings approach",
-      "When you want clear math based on your spend and habits",
-      "When you don’t want a complicated strategy that’s hard to redeem",
-    ],
-    promptTemplate: `I spend roughly \${{monthly_spend}} per month on travel bookings. Help me compare a points/miles strategy vs a simple cash-savings strategy with transparent math.
-
-1. Define my assumptions (I’ll fill these in):
-   - Points earn rate: __ points per $
-   - Realistic redemption value: __ cents per point (conservative and optimistic)
-   - Likelihood I can redeem well: low / medium / high
-   - Cash-savings option: __% average discount or statement credit equivalent
-   - Annual fees: $__
-
-2. Strategy A — Points/miles: Estimate annual points, realistic value, and effort/constraints (availability, blackout, surcharges).
-
-3. Strategy B — Cash savings: Estimate guaranteed annual value (discounts/credits) and simplicity.
-
-4. Head-to-head table: Strategy | Annual value (conservative) | Annual value (optimistic) | Fees | Complexity | Best for.
-
-5. Recommendation: Based on my inputs, recommend the simpler strategy unless the other clearly wins.
-
-6. Suggest 2 follow-up prompts for optimizing whichever strategy I pick.`,
-  },
-  {
-    id: "lounge-access-deals",
-    title: "Get airport lounge access for less",
-    summary:
-      "Compare lounge access methods—cards, memberships, day passes, and pay-per-visit—to find the cheapest option that fits your travel frequency.",
-    category: "Cards & Miles",
-    intent: "comparison",
-    purpose:
-      "Helps travelers avoid overpaying for lounge access by choosing the access method with the best breakeven point.",
-    tags: ["lounges", "airport", "passes", "comparison"],
-    variables: [
+      { key: "destination", label: "Destination", placeholder: "e.g. Portugal", example: "Portugal" },
+      { key: "days", label: "Number of days", placeholder: "e.g. 7", example: "7" },
       { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "airport", label: "Airport name or code", placeholder: "e.g. SIN (Changi)", example: "SIN (Changi)" },
-      { key: "budget", label: "Budget", placeholder: "e.g. <$40/visit or 'premium ok'", example: "<$40/visit" },
+      { key: "budget", label: "Budget level", placeholder: "budget / mid-range / comfort / luxury", example: "mid-range" },
+      { key: "interests", label: "Top interests", placeholder: "e.g. food, history, beaches, wine", example: "food, history, beaches, wine" },
+      { key: "month", label: "Travel month", placeholder: "e.g. May", example: "May" },
     ],
     whenToUse: [
-      "When you want lounge access without paying for a premium card blindly",
-      "When comparing memberships vs day passes",
-      "When you want a breakeven calculation",
+      "When you want a complete plan in one prompt — not five separate ones",
+      "When you need a solid 80% starting point you can refine later",
+      "When you're short on planning time and want to go from zero to bookable fast",
     ],
-    promptTemplate: `What are the most cost-effective ways to get airport lounge access at {{airport}}? I'm traveling as a {{party}} and my rough lounge budget is {{budget}}. Help me compare all options and choose the cheapest one that fits my travel habits.
+    promptTemplate: `Plan my entire trip: {{days}} days in {{destination}} in {{month}}. Traveling as a {{party}}, {{budget}} budget. Interests: {{interests}}.
 
-1. My inputs:
-   - Credit cards I hold: __
-   - Frequent flyer status: __
-   - Flights per year: __
-   - Typical cabin class: economy / premium economy / business
+Give me a complete trip plan in one response:
 
-2. Access methods to compare:
-   - Credit card lounge benefits
-   - Lounge membership programs
-   - Airline lounge day passes
-   - Pay-per-visit at the door
-   - Lounge aggregator apps
+1. WHERE TO STAY: Recommend the best neighborhood and accommodation type for my style. Give a specific area suggestion.
 
-3. Comparison table: Method | Cost | Lounges at {{airport}} | Guest policy | Convenience | Notes.
+2. DAY-BY-DAY ITINERARY: For each day:
+   - Theme and main neighborhood
+   - 2–3 key activities with timing
+   - Lunch and dinner spots (specific names)
+   - How to get around that day
 
-4. Breakeven: Show me how to decide when a membership or premium card makes sense vs paying per visit.
+3. FOOD PLAN: Top 10 dishes I must try and where to find them.
 
-5. Suggest 1–2 follow-up prompts for my specific cards and airports.`,
-  },
+4. BUDGET ESTIMATE: Daily cost breakdown (accommodation, food, transport, activities). Total trip estimate per person.
 
-  // ── Smart savings prompts ───────────────────────────────────────────
-  {
-    id: "promo-vs-cashback-decision",
-    title: "Promo code vs alternative offer: which saves more?",
-    summary:
-      "A simple decision framework for comparing a promo code against another offer (member rate, bundle discount, or credit).",
-    category: "Planning",
-    intent: "decision",
-    purpose:
-      "Helps travelers pick the real best deal by comparing like-for-like and checking the fine print that changes total cost.",
-    tags: ["promo codes", "discounts", "fine print", "decision"],
-    variables: [
-      { key: "promo_value", label: "Promo value", placeholder: "e.g. 15% off or $20 off", example: "15% off" },
-      { key: "alt_offer", label: "Alternative offer", placeholder: "e.g. member rate -10% or $30 credit", example: "member rate -10%" },
-      { key: "order_value", label: "Estimated order value", placeholder: "e.g. $300", example: "$300" },
-    ],
-    whenToUse: [
-      "When you have a promo code and another offer and aren’t sure which is better",
-      "When terms and conditions might change what’s included or refundable",
-      "When you want a quick way to compare apples-to-apples",
-    ],
-    promptTemplate: `I have a promo worth {{promo_value}} and an alternative offer: {{alt_offer}} on a booking worth about {{order_value}}. Help me decide which saves more.
+5. BOOK AHEAD: What to reserve now vs what to leave flexible.
 
-1. Basic math: Convert both offers into dollar value (including whether they apply before/after taxes and fees).
+6. WEATHER & PACKING: What to expect in {{month}} and the 5 most important items to pack.
 
-2. Fine print checklist: What to verify for each offer (eligible dates, minimum spend, excluded room types/fare classes, cancellation/refund changes, caps, “new users only” rules).
+7. LOCAL TIPS: 5 insider tips that will save me time, money, or frustration.
 
-3. Total cost comparison: Show a mini worksheet:
-Option | Base price | Taxes/fees | Discount/credit | Final price | Policy changes | Notes.
+8. TRANSIT CHEAT SHEET: Best way to get from airport to city, daily transport method, and any passes to buy.
 
-4. Decision tree: Give a short flow to pick the winner, prioritizing lowest final price AND acceptable flexibility.
-
-5. Suggest 1–2 follow-up prompts once I paste the real terms.`,
-  },
-  {
-    id: "split-booking-optimizer",
-    title: "Should I split bookings to save money?",
-    summary:
-      "Decide when splitting flights, hotels, and activities across providers lowers total cost vs booking everything in one place.",
-    category: "Packages",
-    intent: "optimization",
-    purpose:
-      "Helps travelers weigh real savings against added complexity, so they don’t create a fragile itinerary to save a tiny amount.",
-    tags: ["split booking", "optimization", "convenience", "total cost"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "friends" },
-      { key: "destination", label: "Destination", placeholder: "e.g. South Korea", example: "South Korea" },
-      { key: "duration", label: "Trip duration (days)", placeholder: "e.g. 7", example: "7" },
-      { key: "budget", label: "Total budget", placeholder: "e.g. $2000 total or 'tight'", example: "$2000 total" },
-    ],
-    whenToUse: [
-      "When you’re tempted to book everything through one site for convenience",
-      "When different providers show different prices for each component",
-      "When you want rules for when splitting is worth it",
-    ],
-    promptTemplate: `I'm planning a {{duration}}-day trip to {{destination}}. We're traveling as a {{party}} with a rough budget of {{budget}}. Help me decide whether to book everything in one place or split across multiple providers to save money without creating chaos.
-
-1. Explain the tradeoff: What you gain (potential savings, better fit per component) vs what you lose (more policies, more support channels, harder changes).
-
-2. Component-by-component checklist: For flights, hotels, activities, and transfers—where do price differences usually matter most, and where should I prioritize flexibility?
-
-3. Comparison table: Component | One-place option | Price | Split option | Price | Savings | Complexity cost.
-
-4. Decision rules: Give thresholds like:
-   - Split when savings is > $__ or > __% AND cancellation risk is low
-   - Don’t split when the itinerary is fragile or support matters more
-
-5. Suggest 2 follow-up prompts once I have real quotes.`,
-  },
-  {
-    id: "boosted-rate-timing",
-    title: "Plan bookings around sales periods (without overpaying)",
-    summary:
-      "A strategy for timing purchases around predictable travel sale windows while tracking real prices and avoiding hype.",
-    category: "Planning",
-    intent: "strategy",
-    purpose:
-      "Helps travelers avoid false savings by pairing sale timing with real price tracking and a clear breakeven calculation.",
-    tags: ["sales", "timing", "promotions", "price tracking"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "couple" },
-      { key: "trip_month", label: "Planned travel month", placeholder: "e.g. December", example: "December" },
-      { key: "budget", label: "Budget", placeholder: "e.g. 'tight' / 'mid-range' / 'comfort'", example: "mid-range" },
-    ],
-    whenToUse: [
-      "When your trip is months away and you can wait for discounts",
-      "When you want to avoid rushing because a sale is live",
-      "When you want a clear booking timeline by component",
-    ],
-    promptTemplate: `I'm planning to travel in {{trip_month}}. I'm traveling as a {{party}} and my rough budget is {{budget}}. Help me build a strategy for timing my bookings around common sales periods without overpaying on base price.
-
-1. Common sale windows: List major periods when travel sites often run promotions (mid-year, 9.9/10.10/11.11, Black Friday, year-end). Note these are “watch windows,” not guarantees.
-
-2. Price vs sale conflict: Walk me through how to decide whether to wait. Include a breakeven calculation: how much price increase would erase a discount?
-
-3. Booking priority order: Suggest a booking timeline for flights vs hotels vs activities vs insurance, based on price volatility and flexibility.
-
-4. Monitoring plan: A simple checklist for price alerts, weekly checks, and tracking a “normal” price.
-
-5. Anti-rush rule: Remind me to compare final prices (after fees) and not chase a discount on an overpriced listing.
-
-6. Suggest 2 follow-up prompts for evaluating a specific sale I’ve found.`,
-  },
-  {
-    id: "rewards-stacking-audit",
-    title: "Audit your trip for missed savings opportunities",
-    summary:
-      "Review an already-planned trip to find quick wins: cheaper rebooking, better policies, lower fees, and smarter add-ons.",
-    category: "Planning",
-    intent: "audit",
-    purpose:
-      "Catches trips that are already in progress and helps travelers reduce cost and risk without restarting the whole plan.",
-    tags: ["audit", "optimization", "quick wins", "rebooking"],
-    variables: [
-      { key: "party", label: "Travel party", placeholder: "solo / couple / family / friends", example: "family" },
-      { key: "destination", label: "Destination", placeholder: "e.g. Europe", example: "Europe" },
-      { key: "budget", label: "Budget", placeholder: "e.g. $4000 total or 'mid-range'", example: "$4000 total" },
-    ],
-    whenToUse: [
-      "When you’ve already booked part of your trip and want to see what you can still improve",
-      "When you want to check if rebooking is worth the hassle",
-      "When you want a short list of the highest-impact fixes",
-    ],
-    promptTemplate: `I have a trip to {{destination}} that’s partially booked. We're traveling as a {{party}} with a rough budget of {{budget}}. Help me audit my bookings for missed savings opportunities and low-risk optimizations.
-
-1. Booking audit checklist (per booking): Ask me:
-   - Did I compare at least 3 sources for the same product?
-   - Is there a cheaper option with similar policies?
-   - Are there hidden fees/add-ons I can avoid (bags, seats, resort fees, transfers)?
-   - Is the cancellation policy too risky for my situation?
-
-2. Rebooking decision framework: For any booking, help me evaluate:
-   - Is it refundable/cancellable? What’s the fee?
-   - Is the net savings worth it after fees and time?
-   - Does rebooking make the trip more fragile (multiple policies/support channels)?
-
-3. Not-yet-booked checklist: Create a prioritized list of what to book next (and what to keep flexible), with money-saving tactics for each.
-
-4. Quick wins: Identify the top 3 highest-impact, lowest-effort changes I can still make.
-
-5. Suggest 1–2 follow-up prompts after I paste my booking details.`,
+Keep it actionable — I want to be able to start booking after reading this.`,
   },
 ];
