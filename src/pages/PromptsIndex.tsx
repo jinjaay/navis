@@ -268,7 +268,7 @@ export const PromptsIndex = ({
   return (
     <div className="flex flex-col pb-16 sm:pb-24">
       {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-16 pb-6 sm:px-6 sm:pt-24 sm:pb-10 lg:pt-28 lg:pb-12">
+      <section className="relative overflow-hidden bg-slate-50/50 px-4 pt-16 pb-6 sm:px-6 sm:pt-24 sm:pb-10 lg:pt-28 lg:pb-12">
         {/* Animated line graphics background */}
         <svg
           className="absolute inset-0 h-full w-full"
@@ -286,12 +286,12 @@ export const PromptsIndex = ({
                 to { stroke-dashoffset: 200; }
               }
               @keyframes circle-pulse {
-                0%, 100% { opacity: 0.04; }
-                50% { opacity: 0.08; }
+                0%, 100% { opacity: 0.6; }
+                50% { opacity: 1; }
               }
               @keyframes dot-pulse {
-                0%, 100% { opacity: 0.06; }
-                50% { opacity: 0.14; }
+                0%, 100% { opacity: 0.5; }
+                50% { opacity: 1; }
               }
               @keyframes grid-drift {
                 to { stroke-dashoffset: -40; }
@@ -331,7 +331,7 @@ export const PromptsIndex = ({
             d="M-100 600 C200 450, 500 700, 720 400 S1100 200, 1540 350"
             stroke="#ff3407"
             strokeWidth="1.5"
-            strokeOpacity="0.18"
+            strokeOpacity="0.162"
             fill="none"
           />
           <path
@@ -339,23 +339,23 @@ export const PromptsIndex = ({
             d="M-100 200 C150 350, 400 100, 720 300 S1050 500, 1540 250"
             stroke="#ff3407"
             strokeWidth="1.5"
-            strokeOpacity="0.15"
+            strokeOpacity="0.135"
             fill="none"
           />
 
           {/* Geometric circles */}
-          <circle className="circle-breathe-1" cx="200" cy="200" r="120" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.15" fill="none" />
-          <circle className="circle-breathe-3" cx="1250" cy="550" r="100" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.15" fill="none" />
+          <circle className="circle-breathe-1" cx="200" cy="200" r="120" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.135" fill="none" />
+          <circle className="circle-breathe-3" cx="1250" cy="550" r="100" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.08" fill="none" />
 
           {/* Accent dots */}
-          <circle className="dot-glow-1" cx="720" cy="400" r="3" fill="#ff3407" fillOpacity="0.25" />
-          <circle className="dot-glow-3" cx="200" cy="200" r="2.5" fill="#ff3407" fillOpacity="0.25" />
-          <circle className="dot-glow-4" cx="1250" cy="550" r="2.5" fill="#ff3407" fillOpacity="0.25" />
+          <circle className="dot-glow-1" cx="720" cy="400" r="3" fill="#ff3407" fillOpacity="0.225" />
+          <circle className="dot-glow-3" cx="200" cy="200" r="2.5" fill="#ff3407" fillOpacity="0.225" />
+          <circle className="dot-glow-4" cx="1250" cy="550" r="2.5" fill="#ff3407" fillOpacity="0.14" />
 
           {/* Subtle grid lines */}
-          <line className="grid-line" x1="0" y1="200" x2="1440" y2="200" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.3" strokeDasharray="8 16" />
-          <line className="grid-line" x1="0" y1="400" x2="1440" y2="400" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.3" strokeDasharray="8 16" />
-          <line className="grid-line" x1="0" y1="600" x2="1440" y2="600" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.3" strokeDasharray="8 16" />
+          <line className="grid-line" x1="0" y1="200" x2="1440" y2="200" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
+          <line className="grid-line" x1="0" y1="400" x2="1440" y2="400" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
+          <line className="grid-line" x1="0" y1="600" x2="1440" y2="600" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
         </svg>
         {/* Radial fade mask over the lines */}
         <div className="absolute inset-0 [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,#000_55%,transparent_100%)]" />
