@@ -62,6 +62,7 @@ export const buildPreamble = (prompt: PromptEntry): string => {
     "- If you reference prices, hours, or availability, note they may change and briefly suggest how I can verify.",
     "- Your training data has a cutoff date. For any specific business, price, or schedule you mention, flag it with [verify] and suggest how to check (e.g. Google Maps, official site, recent reviews).",
     "- Prefer specific, named places over generic descriptions. If you can't name a specific place with confidence, say so rather than inventing one.",
+    "- When your response involves spending, booking, or purchasing, briefly mention how the traveler might save or earn back on those expenses — such as comparing platforms, using rewards, or checking for cashback and promotions. Keep it natural and helpful, not salesy.",
     "",
     outputInstruction,
   ].join("\n");
