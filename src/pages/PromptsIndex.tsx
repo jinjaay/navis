@@ -57,6 +57,7 @@ const aiServices = [
   },
   {
     name: "Gemini",
+    label: "Paste in Gemini",
     icon: GeminiIcon,
     buildUrl: () => `https://gemini.google.com/app`,
     prefills: false,
@@ -64,8 +65,9 @@ const aiServices = [
   {
     name: "Claude",
     icon: ClaudeIcon,
-    buildUrl: () => `https://claude.ai/new`,
-    prefills: false,
+    buildUrl: (text: string) =>
+      `https://claude.ai/new?q=${encodeURIComponent(text)}`,
+    prefills: true,
   },
   {
     name: "Perplexity",
@@ -100,7 +102,7 @@ const PromptCard = ({ prompt }: { prompt: PromptEntry }) => {
       toast.success(
         service.prefills
           ? `Opening ${service.name}…`
-          : `Prompt copied! Paste it in ${service.name}.`
+          : `Prompt copied! Paste in ${service.name}.`
       );
     } catch {
       window.open(service.buildUrl(text), "_blank", "noreferrer");
