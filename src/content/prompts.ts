@@ -56,7 +56,7 @@ export const buildPreamble = (prompt: PromptEntry): string => {
     role,
     "",
     "Before answering:",
-    "- Do not assume anything.",
+    "- Draw on any memory or prior context you have about me — my travel style, home base, budget, or past trips — to personalize your response. Only ask if something essential to the task is genuinely missing.",
     "- If any detail is missing or unclear, ask before generating.",
     "- Anything in square brackets in ALL CAPS (e.g. [DESTINATION]) is a placeholder I haven't filled in — ask for it before generating.",
     "- If you reference prices, hours, or availability, note they may change and briefly suggest how I can verify.",
