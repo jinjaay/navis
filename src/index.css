@@ -29,6 +29,28 @@
     --ring: 11 100% 51%;
   }
 
+  .dark {
+    --background: 220 6% 9%;
+    --foreground: 210 6% 93%;
+    --card: 220 6% 12%;
+    --card-foreground: 210 6% 93%;
+    --popover: 220 6% 12%;
+    --popover-foreground: 210 6% 93%;
+    --primary: 11 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 5% 16%;
+    --secondary-foreground: 210 6% 85%;
+    --muted: 220 5% 16%;
+    --muted-foreground: 220 5% 52%;
+    --accent: 220 5% 16%;
+    --accent-foreground: 210 6% 93%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 220 5% 18%;
+    --input: 220 5% 18%;
+    --ring: 11 100% 55%;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -56,13 +78,24 @@
 /* Only apply hover effects on devices that support hover (non-touch) */
 @media (hover: hover) and (pointer: fine) {
   .hover-card:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.08);
+    background-color: #f8fafc;
+    border-color: #e2e8f0;
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.06);
+  }
+  .dark .hover-card:hover {
+    background-color: hsl(220 6% 15%);
+    border-color: hsl(220 10% 22%);
+    box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.25);
   }
   .hover-copy:hover {
     border-color: #cbd5e1;
     background-color: #f8fafc;
     color: #0f172a;
+  }
+  .dark .hover-copy:hover {
+    border-color: hsl(220 14% 24%);
+    background-color: hsl(220 16% 16%);
+    color: hsl(210 20% 92%);
   }
   .hover-open:hover {
     background-color: #e62e06;
@@ -70,6 +103,10 @@
   .hover-pill:hover {
     background-color: #e2e8f0;
     color: #334155;
+  }
+  .dark .hover-pill:hover {
+    background-color: hsl(220 16% 20%);
+    color: hsl(210 20% 85%);
   }
   .hover-search-ring:hover {
     --tw-ring-color: rgba(255, 52, 7, 0.15);
@@ -83,8 +120,15 @@
   .hover-clear:hover {
     background-color: rgba(255, 52, 7, 0.04);
   }
+  .dark .hover-clear:hover {
+    background-color: rgba(255, 52, 7, 0.08);
+  }
   .hover-clear-x:hover {
     background-color: #f1f5f9;
     color: #475569;
+  }
+  .dark .hover-clear-x:hover {
+    background-color: hsl(220 16% 16%);
+    color: hsl(210 20% 75%);
   }
 }

@@ -50,6 +50,38 @@ export const PerplexityIcon = (props: IconProps) => (
   </svg>
 );
 
+export const PaikoLogo = (props: IconProps) => (
+  <svg
+    viewBox="0 0 68 68"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    {...props}
+  >
+    <path
+      d="M0 0H48C59.0457 0 68 8.95431 68 20V48C68 59.0457 59.0457 68 48 68H0V0Z"
+      fill="#FF3406"
+    />
+    <path
+      d="M43.9914 58C43.9914 54.6743 43.3574 51.5543 42.0721 48.64C40.8383 45.7257 39.1246 43.1714 36.9654 41.0114C34.8061 38.8514 32.2699 37.1543 29.3567 35.92C26.4434 34.6343 3.32453 34 0 34C3.32453 34 26.4434 33.3829 29.3567 32.1314C32.2699 30.8457 34.8233 29.1314 36.9654 26.9714C39.1246 24.8114 40.8211 22.2743 42.0721 19.36C43.3574 16.4457 43.9914 13.3257 43.9914 10C43.9914 13.3257 44.6084 16.4457 45.8593 19.36C47.1446 22.2743 48.8583 24.8286 51.0175 26.9714C53.1767 29.1314 55.713 30.8457 58.6433 32.1314C61.5566 33.3657 64.6755 34 68 34C64.6755 34 61.5566 34.6343 58.6433 35.92C55.7301 37.1543 53.1767 38.8514 51.0175 41.0114C48.8583 43.1714 47.1446 45.7086 45.8593 48.64C44.6255 51.5543 43.9914 54.6743 43.9914 58Z"
+      fill="url(#paiko-logo-grad)"
+    />
+    <defs>
+      <radialGradient
+        id="paiko-logo-grad"
+        cx="0"
+        cy="0"
+        r="1"
+        gradientTransform="matrix(48.3774 16.3619 131.035 -387.709 17.2852 24.3131)"
+        gradientUnits="userSpaceOnUse"
+      >
+        <stop offset="0.07" stopColor="#FF7D60" />
+        <stop offset="0.4375" stopColor="#FFCEC3" />
+        <stop offset="0.67" stopColor="white" />
+      </radialGradient>
+    </defs>
+  </svg>
+);
+
 export const ShopBackLogo = (props: IconProps) => (
   <svg
     viewBox="0 0 231 431"
