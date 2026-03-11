@@ -1,23 +1,31 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 import {
   promptLibrary,
   buildPreamble,
+  categories,
   type PromptEntry,
   type PromptCategory,
 } from "@/content/prompts";
@@ -26,10 +34,10 @@ import {
   GeminiIcon,
   ClaudeIcon,
   PerplexityIcon,
-  // ShopBackLogo,
 } from "@/components/ai-service-icons";
 import { trackEvent } from "@/lib/analytics/analytics";
-import { Search, Copy, ChevronDown, ArrowDown } from "lucide-react";
+import { Effect } from "@/components/animate-ui/primitives/effects/effect";
+import { Search, Copy, ChevronDown, ChevronLeft, ChevronRight, ArrowDown, Lightbulb, CheckCircle2, Variable } from "lucide-react";
 
 const normalize = (value: string) => value.trim().toLowerCase();
 
@@ -46,6 +54,9 @@ const buildPromptText = (prompt: PromptEntry) => {
   const core = prompt.promptTemplate.trim();
   return [preamble, core].filter(Boolean).join("\n\n");
 };
+
+const extractExpectedSections = (template: string): string[] =>
+  [...template.matchAll(/^\d+\.\s+(.+?):/gm)].map((m) => m[1].trim());
 
 const aiServices = [
   {
@@ -78,7 +89,7 @@ const aiServices = [
   },
 ] as const;
 
-const PromptCard = ({ prompt }: { prompt: PromptEntry }) => {
+const usePromptActions = (prompt: PromptEntry) => {
   const text = buildPromptText(prompt);
 
   const handleCopy = async () => {
@@ -92,8 +103,6 @@ const PromptCard = ({ prompt }: { prompt: PromptEntry }) => {
   };
 
   const handleOpenIn = async (service: (typeof aiServices)[number]) => {
-    // Open the window synchronously inside the user gesture so mobile browsers
-    // don't block it as a popup (async clipboard awaits would break this).
     const newTab = window.open(service.buildUrl(text), "_blank", "noreferrer");
     try {
       await navigator.clipboard.writeText(text);
@@ -113,74 +122,307 @@ const PromptCard = ({ prompt }: { prompt: PromptEntry }) => {
     }
   };
 
+  return { handleCopy, handleOpenIn };
+};
+
+const PromptActions = ({
+  prompt,
+  size = "sm",
+}: {
+  prompt: PromptEntry;
+  size?: "sm" | "default";
+}) => {
+  const { handleCopy, handleOpenIn } = usePromptActions(prompt);
+  const isDefault = size === "default";
+
   return (
-    <Card
-      className="hover-card flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all duration-200"
-    >
-      <CardHeader className="gap-1.5 px-4 pb-0 pt-3 sm:px-5 sm:pt-4">
-        <Badge
-          variant="secondary"
-          className="w-fit rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 sm:text-[11px]"
-        >
-          {prompt.category}
-        </Badge>
-        <CardTitle className="text-[15px] font-bold leading-snug tracking-tight text-slate-900 sm:text-base">
-          {prompt.title}
-        </CardTitle>
-        <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">
-          {prompt.summary}
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-1 px-4 pb-0 pt-2 sm:px-5">
-        {prompt.tags.slice(0, 3).map((tag) => (
-          <span
-            key={tag}
-            className="inline-flex items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[9px] font-medium text-slate-400 sm:text-[10px]"
-          >
-            #{tag}
-          </span>
-        ))}
-      </CardContent>
-      <CardFooter className="mt-auto px-4 pb-3 pt-3 sm:px-5 sm:pb-4">
-        <div className="flex w-full items-center gap-2">
+    <div className="flex w-full items-center gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`cursor-pointer hover-copy flex-1 gap-1.5 rounded-lg border border-border font-medium text-muted-foreground ${isDefault ? "h-9 text-xs sm:text-sm" : "h-8 text-[11px] sm:text-xs"}`}
+        onClick={handleCopy}
+      >
+        <Copy className={isDefault ? "h-3.5 w-3.5 sm:h-4 sm:w-4" : "h-3 w-3 sm:h-3.5 sm:w-3.5"} />
+        Copy
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button
-            variant="ghost"
             size="sm"
-            className="cursor-pointer hover-copy h-8 flex-1 gap-1.5 rounded-lg border border-slate-200 text-[11px] font-medium text-slate-600 sm:text-xs"
-            onClick={handleCopy}
+            className={`cursor-pointer hover-open flex-1 gap-1.5 rounded-lg bg-[#ff3407] font-medium text-white transition-all ${isDefault ? "h-9 text-xs sm:text-sm" : "h-8 text-[11px] sm:text-xs"}`}
           >
-            <Copy className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            Copy
+            Use in
+            <ChevronDown className={isDefault ? "h-3.5 w-3.5 opacity-70" : "h-3 w-3 opacity-70 sm:h-3.5 sm:w-3.5"} />
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                className="cursor-pointer hover-open h-8 flex-1 gap-1.5 rounded-lg bg-[#ff3407] text-[11px] font-medium text-white transition-all sm:text-xs"
-              >
-                Use in
-                <ChevronDown className="h-3 w-3 opacity-70 sm:h-3.5 sm:w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="w-44 rounded-xl border-slate-100 p-1 shadow-lg"
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-44 rounded-xl border-border p-1 shadow-lg"
+        >
+          {aiServices.map((service) => (
+            <DropdownMenuItem
+              key={service.name}
+              className="cursor-pointer gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground focus:bg-primary/5 focus:text-primary"
+              onClick={() => handleOpenIn(service)}
             >
-              {aiServices.map((service) => (
-                <DropdownMenuItem
-                  key={service.name}
-                  className="cursor-pointer gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 focus:bg-[#ff3407]/5 focus:text-[#ff3407]"
-                  onClick={() => handleOpenIn(service)}
-                >
-                  <service.icon className="h-4 w-4" />
-                  {"label" in service ? service.label : service.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <service.icon className="h-4 w-4" />
+              {"label" in service ? service.label : service.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
+
+const PromptDetailDialog = ({
+  prompt,
+  open,
+  onOpenChange,
+}: {
+  prompt: PromptEntry;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const sections = extractExpectedSections(prompt.promptTemplate);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[85vh] flex-col overflow-hidden rounded-2xl p-0 sm:max-w-2xl">
+        <div className="flex-1 overflow-y-auto p-6 pb-4">
+          <DialogHeader className="gap-2">
+            <div className="flex items-start justify-between gap-3 pr-6">
+              <DialogTitle className="text-lg font-bold leading-snug tracking-tight sm:text-xl">
+                {prompt.title}
+              </DialogTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-full text-[11px] font-medium">
+                {prompt.category}
+              </Badge>
+            </div>
+            <DialogDescription className="text-sm leading-relaxed">
+              {prompt.summary}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 pt-5">
+            {sections.length > 0 && (
+              <div className="space-y-2.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Lightbulb className="h-4 w-4 text-[#ff3407]" />
+                  What you'll get
+                </h3>
+                <ol className="space-y-1.5 pl-1">
+                  {sections.map((section, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-[#ff3407]">
+                        {i + 1}
+                      </span>
+                      <span className="leading-relaxed">{section}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {prompt.whenToUse && prompt.whenToUse.length > 0 && (
+              <div className="space-y-2.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <CheckCircle2 className="h-4 w-4 text-[#ff3407]" />
+                  When to use
+                </h3>
+                <ul className="space-y-1.5 pl-1">
+                  {prompt.whenToUse.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                      <span className="leading-relaxed">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {prompt.variables && prompt.variables.length > 0 && (
+              <div className="space-y-2.5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <Variable className="h-4 w-4 text-[#ff3407]" />
+                  You'll fill in
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {prompt.variables.map((v) => (
+                    <Badge
+                      key={v.key}
+                      variant="outline"
+                      className="rounded-full px-3 py-1 text-xs font-normal text-muted-foreground"
+                    >
+                      {v.label}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </CardFooter>
-    </Card>
+
+        <DialogFooter className="relative sticky bottom-0 bg-background px-6 pb-4 before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-gradient-to-t before:from-background before:to-transparent sm:flex-row">
+          <PromptActions prompt={prompt} size="default" />
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const PromptCard = ({ prompt }: { prompt: PromptEntry }) => {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  return (
+    <>
+      <Card className="hover-card flex h-[180px] w-[260px] shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm transition-all duration-200 sm:h-[200px] sm:w-[300px]">
+        <CardHeader
+          className="cursor-pointer gap-1.5 px-4 pb-0 pt-3 sm:px-5 sm:pt-4"
+          onClick={() => {
+            setDialogOpen(true);
+            trackEvent({ name: "prompt_view", payload: { slug: prompt.id } });
+          }}
+        >
+          <CardTitle className="line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-card-foreground sm:text-base">
+            {prompt.title}
+          </CardTitle>
+          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+            {prompt.summary}
+          </p>
+        </CardHeader>
+        <CardFooter className="mt-auto px-4 pb-3 pt-3 sm:px-5 sm:pb-4">
+          <PromptActions prompt={prompt} />
+        </CardFooter>
+      </Card>
+      <PromptDetailDialog
+        prompt={prompt}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+    </>
+  );
+};
+
+const categoryAnchorId = (cat: PromptCategory) =>
+  cat.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+const categoryDisplayLabel: Record<PromptCategory, string> = {
+  Itinerary: "Build Your Itinerary",
+  Stays: "Where to Stay",
+  "Food & Drink": "Eat & Drink Like a Local",
+  Routes: "Routes & Getting Around",
+  Discovery: "Discover Hidden Gems",
+  "Smart Planning": "Smart Travel Planning",
+};
+
+const CategoryRow = ({
+  category,
+  prompts,
+}: {
+  category: PromptCategory;
+  prompts: PromptEntry[];
+}) => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 2);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    el.addEventListener("scroll", updateScrollState, { passive: true });
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      ro.disconnect();
+    };
+  }, [updateScrollState, prompts]);
+
+  const scroll = (direction: "left" | "right") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.75;
+    el.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
+  if (prompts.length === 0) return null;
+
+  return (
+    <div id={categoryAnchorId(category)} className="scroll-mt-28 sm:scroll-mt-24">
+      <Effect
+        inView
+        inViewOnce
+        inViewMargin="-40px"
+        fade
+        slide={{ direction: "up", offset: 24 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      >
+        <div className="mb-3 flex items-center justify-between px-6 sm:mb-4 sm:px-10">
+          <h2 className="text-lg font-bold tracking-tight text-[#ff3407] sm:text-xl">
+            {categoryDisplayLabel[category]}
+          </h2>
+          <span className="text-xs text-muted-foreground sm:text-sm">
+            {prompts.length} prompt{prompts.length !== 1 && "s"}
+          </span>
+        </div>
+      </Effect>
+
+      <Effect
+        inView
+        inViewOnce
+        inViewMargin="-20px"
+        fade
+        slide={{ direction: "up", offset: 32 }}
+        delay={80}
+        transition={{ type: "spring", stiffness: 260, damping: 28 }}
+      >
+        <div className="group relative">
+          {canScrollLeft && (
+            <button
+              onClick={() => scroll("left")}
+              className="absolute left-0 top-0 z-10 hidden h-full w-10 cursor-pointer items-center justify-center bg-gradient-to-r from-background/90 to-transparent transition-opacity sm:flex"
+              aria-label="Scroll left"
+            >
+              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+            </button>
+          )}
+
+          <div
+            ref={scrollRef}
+            className="flex gap-4 overflow-x-auto px-6 pb-2 scrollbar-hide sm:gap-5 sm:px-10"
+          >
+            {prompts.map((prompt) => (
+              <PromptCard key={prompt.id} prompt={prompt} />
+            ))}
+          </div>
+
+          {canScrollRight && (
+            <button
+              onClick={() => scroll("right")}
+              className="absolute right-0 top-0 z-10 hidden h-full w-10 cursor-pointer items-center justify-center bg-gradient-to-l from-background/90 to-transparent transition-opacity sm:flex"
+              aria-label="Scroll right"
+            >
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+      </Effect>
+    </div>
   );
 };
 
@@ -245,37 +487,30 @@ const TypingText = () => {
 interface PromptsIndexProps {
   search: string;
   setSearch: (value: string) => void;
-  category: "all" | PromptCategory;
-  setCategory: (value: "all" | PromptCategory) => void;
 }
 
-export const PromptsIndex = ({
-  search,
-  setSearch,
-  category,
-  setCategory,
-}: PromptsIndexProps) => {
+export const PromptsIndex = ({ search, setSearch }: PromptsIndexProps) => {
   const cardsRef = useRef<HTMLDivElement>(null);
 
-  const filteredPrompts = useMemo(() => {
+  const promptsByCategory = useMemo(() => {
     const query = normalize(search);
-    return promptLibrary.filter((prompt) => {
-      const categoryMatch =
-        category === "all" || prompt.category === category;
-      return categoryMatch && matchesSearch(prompt, query);
-    });
-  }, [search, category]);
+    return categories.map((cat) => ({
+      category: cat,
+      prompts: promptLibrary.filter(
+        (p) => p.category === cat && matchesSearch(p, query)
+      ),
+    }));
+  }, [search]);
 
-  const handleReset = () => {
-    setSearch("");
-    setCategory("all");
-  };
+  const totalMatches = promptsByCategory.reduce(
+    (sum, row) => sum + row.prompts.length,
+    0
+  );
 
   return (
     <div className="flex flex-col pb-16 sm:pb-24">
       {/* Hero */}
-      <section className="relative overflow-hidden bg-slate-50/50 px-4 pt-16 pb-6 sm:px-6 sm:pt-24 sm:pb-10 lg:pt-28 lg:pb-12">
-        {/* Animated line graphics background */}
+      <section className="relative overflow-hidden bg-secondary/50 px-4 pt-16 pb-6 sm:px-6 sm:pt-24 sm:pb-10 lg:pt-28 lg:pb-12">
         <svg
           className="absolute inset-0 h-full w-full"
           viewBox="0 0 1440 800"
@@ -298,9 +533,6 @@ export const PromptsIndex = ({
               @keyframes dot-pulse {
                 0%, 100% { opacity: 0.5; }
                 50% { opacity: 1; }
-              }
-              @keyframes grid-drift {
-                to { stroke-dashoffset: -40; }
               }
               .flow-1 {
                 stroke-dasharray: 120 80;
@@ -325,13 +557,9 @@ export const PromptsIndex = ({
               .dot-glow-4 {
                 animation: dot-pulse 4.5s ease-in-out infinite 2s;
               }
-              .grid-line {
-                animation: grid-drift 8s linear infinite;
-              }
             `}</style>
           </defs>
 
-          {/* Subtle flowing curves */}
           <path
             className="flow-1"
             d="M-100 600 C200 450, 500 700, 720 400 S1100 200, 1540 350"
@@ -349,32 +577,25 @@ export const PromptsIndex = ({
             fill="none"
           />
 
-          {/* Geometric circles */}
           <circle className="circle-breathe-1" cx="200" cy="200" r="120" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.135" fill="none" />
           <circle className="circle-breathe-3" cx="1250" cy="550" r="100" stroke="#ff3407" strokeWidth="0.8" strokeOpacity="0.08" fill="none" />
 
-          {/* Accent dots */}
           <circle className="dot-glow-1" cx="720" cy="400" r="3" fill="#ff3407" fillOpacity="0.225" />
           <circle className="dot-glow-3" cx="200" cy="200" r="2.5" fill="#ff3407" fillOpacity="0.225" />
           <circle className="dot-glow-4" cx="1250" cy="550" r="2.5" fill="#ff3407" fillOpacity="0.14" />
 
-          {/* Subtle grid lines */}
-          <line className="grid-line" x1="0" y1="200" x2="1440" y2="200" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
-          <line className="grid-line" x1="0" y1="400" x2="1440" y2="400" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
-          <line className="grid-line" x1="0" y1="600" x2="1440" y2="600" stroke="#cbd5e1" strokeWidth="0.4" strokeOpacity="0.27" strokeDasharray="8 16" />
         </svg>
-        {/* Radial fade mask over the lines */}
         <div className="absolute inset-0 [mask-image:radial-gradient(ellipse_70%_70%_at_50%_50%,#000_55%,transparent_100%)]" />
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center text-center relative z-10">
-          <h1 className="mt-5 max-w-4xl text-3xl font-extrabold tracking-tight text-slate-900 sm:mt-7 sm:text-5xl md:text-6xl">
+          <h1 className="mt-5 max-w-4xl text-3xl font-extrabold tracking-tight text-foreground sm:mt-7 sm:text-5xl md:text-6xl">
             <span className="block bg-gradient-to-r from-[#ff3407] to-[#ffd6cd] bg-clip-text text-transparent min-h-[1.2em]">
               <TypingText />
             </span>
-            <span className="block mt-1 sm:mt-2">like a smart traveler</span>
+            <span className="block mt-1 sm:mt-2">with Paiko</span>
           </h1>
 
-          <p className="mt-4 max-w-sm sm:max-w-xl text-sm leading-relaxed text-slate-500 sm:mt-6 sm:text-lg sm:leading-relaxed">
-            Smart travel prompts for your next trip. Build itineraries, compare and discover based on your needs.
+          <p className="mt-4 max-w-sm sm:max-w-xl text-sm leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg sm:leading-relaxed">
+            Your prompt travel guide. Structured prompts that get you detailed, useful answers with no back-and-forth needed
           </p>
 
           <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
@@ -392,7 +613,7 @@ export const PromptsIndex = ({
             <Button
               size="lg"
               variant="outline"
-              className="cursor-pointer gap-2 rounded-full border-slate-300 px-8 py-3 text-sm font-medium text-slate-600 shadow-none transition-all hover:bg-slate-100 hover:border-slate-400 hover:text-slate-800 sm:px-10 sm:py-3.5 sm:text-base"
+              className="cursor-pointer gap-2 rounded-full border-border px-8 py-3 text-sm font-medium text-muted-foreground shadow-none transition-all hover:bg-accent hover:border-border hover:text-foreground sm:px-10 sm:py-3.5 sm:text-base"
               asChild
             >
               <a
@@ -405,45 +626,50 @@ export const PromptsIndex = ({
             </Button>
           </div>
         </div>
-        {/* Bottom gradient fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-transparent to-white pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-b from-transparent to-background pointer-events-none" />
       </section>
 
-      {/* Main Content */}
-      <section ref={cardsRef} className="scroll-mt-28 mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-6 sm:scroll-mt-24 sm:gap-10 sm:px-6 sm:pt-8">
-
-        {/* Cards Grid */}
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredPrompts.map((prompt) => (
-            <PromptCard key={prompt.id} prompt={prompt} />
-          ))}
-        </div>
-
-        {/* Results count */}
-        {filteredPrompts.length > 0 && (
-          <div className="flex items-center justify-center pt-1 pb-2 sm:pt-2 sm:pb-4">
-            <p className="text-xs text-muted-foreground sm:text-sm">
-              Showing <span className="font-semibold text-foreground">{filteredPrompts.length}</span> prompt{filteredPrompts.length !== 1 && "s"}
-            </p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {filteredPrompts.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/60 bg-slate-50/50 px-4 py-16 text-center sm:gap-4 sm:rounded-3xl sm:py-24">
-            <div className="rounded-full bg-slate-100 p-3 sm:p-4">
+      {/* Category Rows */}
+      <section ref={cardsRef} className="scroll-mt-28 mx-auto flex w-full max-w-7xl flex-col gap-8 pt-6 sm:scroll-mt-24 sm:gap-12 sm:pt-8">
+        {totalMatches > 0 ? (
+          promptsByCategory.map(({ category: cat, prompts }) => (
+            <CategoryRow key={cat} category={cat} prompts={prompts} />
+          ))
+        ) : (
+          <div className="mx-4 flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/60 bg-secondary/50 px-4 py-16 text-center sm:mx-6 sm:gap-4 sm:rounded-3xl sm:py-24">
+            <div className="rounded-full bg-muted p-3 sm:p-4">
               <Search className="h-6 w-6 text-muted-foreground/50 sm:h-8 sm:w-8" />
             </div>
             <div className="max-w-md space-y-1.5 sm:space-y-2">
               <h3 className="text-lg font-semibold text-foreground sm:text-xl">No prompts found</h3>
               <p className="text-sm text-muted-foreground sm:text-base">
-                We couldn't find any prompts matching "{search}". Try adjusting your search or filters.
+                We couldn't find any prompts matching "{search}". Try adjusting your search.
               </p>
             </div>
-            <Button variant="outline" onClick={handleReset} className="cursor-pointer mt-2 rounded-full text-sm sm:mt-4">
-              Clear all filters
+            <Button
+              variant="outline"
+              onClick={() => setSearch("")}
+              className="cursor-pointer mt-2 rounded-full text-sm sm:mt-4"
+            >
+              Clear search
             </Button>
           </div>
+        )}
+
+        {totalMatches > 0 && (
+          <Effect
+            inView
+            inViewOnce
+            inViewMargin="-20px"
+            fade
+            transition={{ type: "spring", stiffness: 200, damping: 30 }}
+          >
+            <div className="flex items-center justify-center pb-2 sm:pb-4">
+              <p className="text-xs text-muted-foreground sm:text-sm">
+                Showing <span className="font-semibold text-foreground">{totalMatches}</span> prompt{totalMatches !== 1 && "s"} across {promptsByCategory.filter((r) => r.prompts.length > 0).length} categories
+              </p>
+            </div>
+          </Effect>
         )}
       </section>
     </div>

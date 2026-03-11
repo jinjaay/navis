@@ -70,11 +70,11 @@ export const buildPreamble = (prompt: PromptEntry): string => {
 
 export const categories: PromptCategory[] = [
   "Itinerary",
+  "Smart Planning",
   "Stays",
   "Food & Drink",
   "Routes",
   "Discovery",
-  "Smart Planning",
 ];
 
 export const promptLibrary: PromptEntry[] = [
