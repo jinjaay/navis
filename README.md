@@ -1,4 +1,4 @@
-# Travistry
+# Folleo
 
 Travistry is a lightweight React app that curates travel-focused AI prompts to help you ask better questions about flights, hotels, destinations, and trip planning—so you can save more on every trip.
 
