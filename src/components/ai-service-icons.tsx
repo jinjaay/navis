@@ -58,8 +58,8 @@ export const FolleoLogo = (props: IconProps) => (
     {...props}
   >
     <rect x="4" y="4" width="56" height="56" rx="14" fill="#FF3407" />
-    <path d="M32 12 L23 37 L32 30 L41 37 Z" fill="white" />
-    <path d="M32 52 L41 37 L32 44 L23 37 Z" fill="white" fillOpacity="0.4" />
+    <path d="M32 14 Q30 22 23 37 L32 30 L41 37 Q34 22 32 14 Z" fill="white" strokeLinejoin="round" />
+    <path d="M32 50 Q34 42 41 37 L32 44 L23 37 Q30 42 32 50 Z" fill="white" fillOpacity="0.4" strokeLinejoin="round" />
     <circle cx="32" cy="32" r="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.2" fill="none" />
   </svg>
 );
