@@ -50,37 +50,17 @@ export const PerplexityIcon = (props: IconProps) => (
   </svg>
 );
 
-export const TravistryLogo = (props: IconProps) => (
+export const FolleoLogo = (props: IconProps) => (
   <svg
     viewBox="0 0 64 64"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
-    {/* Back panel */}
-    <rect x="8" y="6" width="48" height="52" rx="4" fill="#FF3407" />
-    {/* Shelf top */}
-    <rect x="6" y="12" width="52" height="4" rx="1.5" fill="#FF3407" />
-    {/* Shelf middle */}
-    <rect x="6" y="30" width="52" height="4" rx="1.5" fill="#FF3407" />
-    {/* Shelf bottom */}
-    <rect x="6" y="48" width="52" height="4" rx="1.5" fill="#FF3407" />
-    {/* Book 1 — tall */}
-    <rect x="14" y="16" width="7" height="14" rx="1.5" fill="#FFCEC3" />
-    {/* Book 2 — medium, tilted feel via narrower */}
-    <rect x="23" y="19" width="5" height="11" rx="1" fill="#FF7D60" />
-    {/* Book 3 — tall */}
-    <rect x="30" y="17" width="6" height="13" rx="1.5" fill="white" fillOpacity="0.85" />
-    {/* Book 4 — short */}
-    <rect x="38" y="21" width="7" height="9" rx="1.5" fill="#FFCEC3" />
-    {/* Book 5 — bottom shelf */}
-    <rect x="15" y="34" width="8" height="14" rx="1.5" fill="white" fillOpacity="0.85" />
-    {/* Book 6 */}
-    <rect x="25" y="36" width="6" height="12" rx="1" fill="#FF7D60" />
-    {/* Book 7 */}
-    <rect x="33" y="35" width="7" height="13" rx="1.5" fill="#FFCEC3" />
-    {/* Book 8 */}
-    <rect x="42" y="37" width="5" height="11" rx="1" fill="white" fillOpacity="0.7" />
+    <rect x="4" y="4" width="56" height="56" rx="14" fill="#FF3407" />
+    <path d="M32 14 Q30 22 23 37 L32 30 L41 37 Q34 22 32 14 Z" fill="white" strokeLinejoin="round" />
+    <path d="M32 50 Q34 42 41 37 L32 44 L23 37 Q30 42 32 50 Z" fill="white" fillOpacity="0.4" strokeLinejoin="round" />
+    <circle cx="32" cy="32" r="24" stroke="white" strokeWidth="1.5" strokeOpacity="0.2" fill="none" />
   </svg>
 );
 
